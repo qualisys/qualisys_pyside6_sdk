@@ -5,15 +5,10 @@ PySide6-based SDK for the Qualisys Real-Time (RT) protocol. Stream motion captur
 ## Installation
 
 ```bash
-git clone --recursive https://github.com/qualisys/qualisys_pyside6_sdk.git
-cd qualisys_pyside6_sdk
-pip install -e .
+pip install qtm-rt-pyside6
 ```
 
-If you've already cloned without `--recursive`:
-```bash
-git submodule update --init
-```
+Requires Python 3.10+ and PySide6 6.0+.
 
 ## Quick Start
 
@@ -84,28 +79,37 @@ Valid streaming components: `2d`, `2dlin`, `3d`, `3dres`, `3dnolabels`, `3dnolab
 
 ## Examples
 
-```bash
-# Console examples
-python examples/basic_example.py         # Stream 3D markers
-python examples/discovery_example.py     # Find QTM on network
-python examples/parameters_example.py    # Get QTM configuration
+The [examples/](examples/) directory contains ready-to-run scripts (requires QTM running):
 
-# GUI examples
-python examples/gui_example.py           # Qt Widgets GUI with table view
-python examples/gui_3d_example/main.py   # Qt Quick 3D visualization
+- **basic_example.py** - Stream 3D markers to console
+- **discovery_example.py** - Find QTM on the network
+- **parameters_example.py** - Get QTM configuration as XML
+- **gui_example.py** - Qt Widgets GUI with data table
+- **gui_3d_example/** - Qt Quick 3D visualization with orbit camera
+
+## Development
+
+To work on the SDK itself:
+
+```bash
+git clone --recursive https://github.com/qualisys/qualisys_pyside6_sdk.git
+cd qualisys_pyside6_sdk
+pip install -r requirements-dev.txt
+pip install -e .
 ```
 
-### GUI Example
-Qt Widgets application with connection controls, streaming toggle, and data table.
+If you cloned without `--recursive`:
+```bash
+git submodule update --init
+```
 
-### 3D Viewer Example
-Qt Quick 3D application showing markers as colored spheres in an interactive 3D scene with orbit camera controls.
-
-## Requirements
-
-- Python 3.10+
-- PySide6 6.0+
+Run tests and linting:
+```bash
+pytest -v
+ruff check .
+ruff format --check .
+```
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE) and [THIRD_PARTY_LICENSES](THIRD_PARTY_LICENSES).
