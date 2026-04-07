@@ -5,7 +5,7 @@ import struct
 from collections import deque
 from collections.abc import Callable
 
-from PySide6.QtCore import QObject, Signal, Slot
+from PySide6.QtCore import QObject, QTimer, Signal, Slot
 from PySide6.QtNetwork import QAbstractSocket, QTcpSocket
 from qtm_rt.packet import QRTEvent, QRTPacket, QRTPacketType, RTCommand, RTheader
 from qtm_rt.receiver import Receiver
@@ -97,6 +97,10 @@ class QTMConnection(QObject):
         self._streaming = False
         self._response_callbacks: dict[str, Callable] = {}
 
+        self._connect_timer = QTimer(self)
+        self._connect_timer.setSingleShot(True)
+        self._connect_timer.timeout.connect(self._onConnectTimeout)
+
         # Packet handlers using the reusable Receiver from original SDK
         self._handlers = {
             QRTPacketType.PacketError: self._onError,
@@ -113,15 +117,18 @@ class QTMConnection(QObject):
     # -------------------------------------------------------------------------
 
     @Slot(str, int)
-    def connectToHost(self, host: str, port: int = 22223, version: str = "1.25"):
+    def connectToHost(self, host: str, port: int = 22223, version: str = "1.25", timeout_ms: int = 5000):
         """Connect to QTM at the specified host and port.
 
         Args:
             host: IP address or hostname of QTM
             port: Port number (default 22223 for little endian)
             version: Protocol version (default "1.25")
+            timeout_ms: Connection timeout in milliseconds (default 5000). Set to 0 to disable.
         """
         self._version = version
+        if timeout_ms > 0:
+            self._connect_timer.start(timeout_ms)
         self._socket.connectToHost(host, port)
 
     @Slot()
@@ -416,12 +423,14 @@ class QTMConnection(QObject):
 
     def _onSocketConnected(self):
         """Handle socket connected - negotiate protocol version."""
+        self._connect_timer.stop()
         LOG.info("Socket connected, negotiating version %s", self._version)
         self._command_queue.append("version")
         self._sendCommand(f"version {self._version}")
 
     def _onSocketDisconnected(self):
         """Handle socket disconnected."""
+        self._connect_timer.stop()
         LOG.info("Disconnected")
         self._streaming = False
         self._command_queue.clear()
@@ -431,9 +440,17 @@ class QTMConnection(QObject):
 
     def _onSocketError(self, error: QAbstractSocket.SocketError):
         """Handle socket error."""
+        self._connect_timer.stop()
         error_string = self._socket.errorString()
         LOG.error("Socket error: %s", error_string)
         self.error.emit(error_string)
+
+    def _onConnectTimeout(self):
+        """Handle connection timeout."""
+        if not self.isConnected():
+            LOG.error("Connection timed out")
+            self._socket.abort()
+            self.error.emit("Connection timed out")
 
     def _onReadyRead(self):
         """Handle incoming data."""
