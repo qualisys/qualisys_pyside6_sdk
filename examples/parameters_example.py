@@ -4,7 +4,9 @@ Parameters example - Request and display QTM configuration
 
 import sys
 import xml.etree.ElementTree as ET
+
 from PySide6.QtCore import QCoreApplication
+
 from qtm_rt_pyside6 import QTMConnection
 
 

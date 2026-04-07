@@ -3,7 +3,9 @@ Discovery example - Find QTM instances on the network
 """
 
 import sys
+
 from PySide6.QtCore import QCoreApplication
+
 from qtm_rt_pyside6 import QTMDiscovery, QTMDiscoveryResponse
 
 

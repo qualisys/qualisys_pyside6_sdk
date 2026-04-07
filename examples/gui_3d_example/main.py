@@ -7,19 +7,15 @@ Shows motion capture markers as spheres and skeleton bones as cones.
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional
 
-from PySide6.QtCore import (
-    QObject, Property, Signal, Slot, QUrl,
-    QAbstractListModel, QModelIndex, Qt, QByteArray
-)
-from PySide6.QtGui import QGuiApplication, QVector3D, QQuaternion
+from PySide6.QtCore import Property, QAbstractListModel, QByteArray, QModelIndex, QObject, Qt, QUrl, Signal, Slot
+from PySide6.QtGui import QGuiApplication, QQuaternion, QVector3D
 from PySide6.QtQml import QQmlApplicationEngine, qmlRegisterType
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from qtm_rt_pyside6 import QTMConnection, QTMDiscovery, QRTPacket
+from qtm_rt_pyside6 import QRTPacket, QTMConnection, QTMDiscovery
 
 
 def qtm_to_qt3d_position(x, y, z):
@@ -82,11 +78,7 @@ class MarkerModel(QAbstractListModel):
         else:
             self._positions = new_positions
             if new_count > 0:
-                self.dataChanged.emit(
-                    self.index(0),
-                    self.index(new_count - 1),
-                    [self.PositionRole]
-                )
+                self.dataChanged.emit(self.index(0), self.index(new_count - 1), [self.PositionRole])
 
 
 class BoneModel(QAbstractListModel):
@@ -137,11 +129,7 @@ class BoneModel(QAbstractListModel):
         else:
             self._bones = bones
             if new_count > 0:
-                self.dataChanged.emit(
-                    self.index(0),
-                    self.index(new_count - 1),
-                    [self.StartPosRole, self.EndPosRole]
-                )
+                self.dataChanged.emit(self.index(0), self.index(new_count - 1), [self.StartPosRole, self.EndPosRole])
 
 
 class RigidBodyModel(QAbstractListModel):
@@ -185,7 +173,7 @@ class RigidBodyModel(QAbstractListModel):
             self.IndexRole: QByteArray(b"bodyIndex"),
         }
 
-    def setNames(self, names: List[str]):
+    def setNames(self, names: list[str]):
         self._names = names
 
     def updateBodies(self, bodies):
@@ -200,11 +188,7 @@ class RigidBodyModel(QAbstractListModel):
         else:
             self._bodies = bodies
             if new_count > 0:
-                self.dataChanged.emit(
-                    self.index(0),
-                    self.index(new_count - 1),
-                    [self.PositionRole, self.RotationRole]
-                )
+                self.dataChanged.emit(self.index(0), self.index(new_count - 1), [self.PositionRole, self.RotationRole])
 
 
 class SceneTreeModel(QAbstractListModel):
@@ -290,8 +274,8 @@ class SkeletonDefinition:
     """Holds skeleton hierarchy parsed from QTM parameters"""
 
     def __init__(self):
-        self.segments: Dict[int, str] = {}  # id -> name
-        self.parent_map: Dict[int, int] = {}  # child_id -> parent_id
+        self.segments: dict[int, str] = {}  # id -> name
+        self.parent_map: dict[int, int] = {}  # child_id -> parent_id
 
     def parse_xml(self, xml_str: str):
         """Parse skeleton parameters XML"""
@@ -310,7 +294,7 @@ class SkeletonDefinition:
         except ET.ParseError as e:
             print(f"Failed to parse skeleton XML: {e}")
 
-    def _parse_segments(self, element, parent_id: Optional[int]):
+    def _parse_segments(self, element, parent_id: int | None):
         """Recursively parse segment hierarchy"""
         # Find direct Segment children
         segments = element.findall("Segment")
@@ -326,7 +310,7 @@ class SkeletonDefinition:
             # Recurse into nested segments (children are nested inside parent)
             self._parse_segments(segment, parent_id=seg_id)
 
-    def get_bone_connections(self) -> List[Tuple[int, int]]:
+    def get_bone_connections(self) -> list[tuple[int, int]]:
         """Get list of (parent_id, child_id) for all bones"""
         return [(parent, child) for child, parent in self.parent_map.items()]
 
@@ -364,14 +348,14 @@ class Backend(QObject):
 
         # Skeleton definition (hierarchy)
         self._skeleton_def = SkeletonDefinition()
-        self._skeleton_names: List[str] = []
-        self._bone_connections: List[Tuple[int, int]] = []
+        self._skeleton_names: list[str] = []
+        self._bone_connections: list[tuple[int, int]] = []
 
         # Rigid body names
-        self._rigid_body_names: List[str] = []
+        self._rigid_body_names: list[str] = []
 
         # Marker names
-        self._marker_names: List[str] = []
+        self._marker_names: list[str] = []
 
         # QTM connection
         self._connection = QTMConnection(self)
@@ -386,6 +370,7 @@ class Backend(QObject):
 
         # FPS timer
         from PySide6.QtCore import QTimer
+
         self._fps_timer = QTimer(self)
         self._fps_timer.timeout.connect(self._update_fps)
         self._fps_timer.setInterval(1000)
@@ -512,19 +497,17 @@ class Backend(QObject):
             self._rigid_body_names = self._parse_6d_body_names(data)
             self._rigid_body_model.setNames(self._rigid_body_names)
 
-            print(f"Parsed {len(self._marker_names)} markers, {len(self._skeleton_def.segments)} segments, {len(self._bone_connections)} bones, {len(self._rigid_body_names)} rigid bodies")
+            print(
+                f"Parsed {len(self._marker_names)} markers, {len(self._skeleton_def.segments)} segments, {len(self._bone_connections)} bones, {len(self._rigid_body_names)} rigid bodies"
+            )
 
             # Update scene tree
-            self._scene_tree_model.updateTree(
-                self._marker_names,
-                self._skeleton_names,
-                self._rigid_body_names
-            )
+            self._scene_tree_model.updateTree(self._marker_names, self._skeleton_names, self._rigid_body_names)
 
             self._status = "Connected"
             self.statusChanged.emit()
 
-    def _parse_skeleton_names(self, xml_str: str) -> List[str]:
+    def _parse_skeleton_names(self, xml_str: str) -> list[str]:
         """Parse skeleton names from XML"""
         names = []
         try:
@@ -536,7 +519,7 @@ class Backend(QObject):
             pass
         return names
 
-    def _parse_6d_body_names(self, xml_str: str) -> List[str]:
+    def _parse_6d_body_names(self, xml_str: str) -> list[str]:
         """Parse 6D rigid body names from XML"""
         names = []
         try:
@@ -549,7 +532,7 @@ class Backend(QObject):
             pass
         return names
 
-    def _parse_marker_names(self, xml_str: str) -> List[str]:
+    def _parse_marker_names(self, xml_str: str) -> list[str]:
         """Parse 3D marker names from XML"""
         names = []
         try:
@@ -617,8 +600,8 @@ class Backend(QObject):
             all_bones = []
             for skeleton_segments in skeletons:
                 # Create dict of segment_id -> position
-                segment_positions: Dict[int, QVector3D] = {}
-                for seg_id, position, rotation in skeleton_segments:
+                segment_positions: dict[int, QVector3D] = {}
+                for seg_id, position, _rotation in skeleton_segments:
                     pos = qtm_to_qt3d_position(position.x, position.y, position.z)
                     segment_positions[seg_id] = pos
 

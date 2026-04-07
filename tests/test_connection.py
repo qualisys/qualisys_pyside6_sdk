@@ -1,9 +1,9 @@
 """Tests for QTMConnection"""
 
+from unittest.mock import MagicMock
+
 import pytest
-from unittest.mock import MagicMock, patch
-from PySide6.QtCore import QCoreApplication
-from PySide6.QtNetwork import QTcpSocket, QAbstractSocket
+from PySide6.QtNetwork import QTcpSocket
 
 from qtm_rt_pyside6 import QTMConnection
 

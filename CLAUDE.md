@@ -18,13 +18,28 @@ pip install -e .
 # Initialize submodule (required after clone)
 git submodule update --init
 
-# Run tests
+# Run all tests
 pytest -v
+
+# Run a single test file or test
+pytest tests/test_connection.py -v
+pytest tests/test_connection.py::TestQTMConnectionInit::test_creates_socket -v
 
 # Run examples (requires QTM running)
 python examples/basic_example.py
 python examples/discovery_example.py
 ```
+
+```bash
+# Lint and format
+ruff check .
+ruff format --check .
+ruff format .          # auto-fix formatting
+```
+
+Tests use `pytest-qt` (configured in `pyproject.toml` with `qt_api = pyside6`). Use `qtbot.waitSignal()` for signal assertions.
+
+Version is derived from git tags via `setuptools-scm`. Tag a release with `v0.1.0` format.
 
 ## Architecture
 
@@ -68,7 +83,20 @@ connection.getParameters(["3d"])
 
 ### Data Flow
 
-1. `QTMConnection.connectToHost(host)` → `QTcpSocket.connectToHost()`
-2. Socket `connected` signal → send version command → emit `connected` signal
-3. `streamFrames(components)` → sends command to QTM
-4. Socket `readyRead` → `Receiver.data_received()` → packet handlers → emit `packetReceived`
+1. `QTMConnection.connectToHost(host)` -> `QTcpSocket.connectToHost()`
+2. Socket `connected` signal -> send version command -> emit `connected` signal
+3. `streamFrames(components)` -> sends command to QTM
+4. Socket `readyRead` -> `Receiver.data_received()` -> packet handlers -> emit `packetReceived`
+
+### Protocol Defaults
+
+- TCP port: 22223 (little-endian)
+- UDP discovery port: 22226
+- Protocol version: "1.25"
+- Logger name: `"qtm_rt_pyside6"`
+
+### Valid Identifiers
+
+**Streaming components:** `2d`, `2dlin`, `3d`, `3dres`, `3dnolabels`, `3dnolabelsres`, `analog`, `analogsingle`, `force`, `forcesingle`, `6d`, `6dres`, `6deuler`, `6deulerres`, `gazevector`, `eyetracker`, `image`, `timecode`, `skeleton`, `skeleton:global`
+
+**Parameter names for `getParameters()`:** `all`, `general`, `3d`, `6d`, `analog`, `force`, `gazevector`, `eyetracker`, `image`, `skeleton`, `skeleton:global`, `calibration`

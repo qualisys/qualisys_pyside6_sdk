@@ -14,9 +14,10 @@ dist/
 venv/
 ENV/
 
-# IDE
+# IDE / AI tools
 .idea/
 .vscode/
+.claude/
 *.swp
 *.swo
 

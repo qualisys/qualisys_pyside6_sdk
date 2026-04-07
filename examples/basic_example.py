@@ -5,8 +5,10 @@ Start QTM first, load a file, and enable Play -> Play with Real-Time output
 """
 
 import sys
+
 from PySide6.QtCore import QCoreApplication
-from qtm_rt_pyside6 import QTMConnection, QRTPacket
+
+from qtm_rt_pyside6 import QRTPacket, QTMConnection
 
 
 class StreamingApp:

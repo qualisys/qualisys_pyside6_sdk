@@ -1,13 +1,11 @@
 """QTM Discovery using Qt network stack"""
 
-import struct
 import logging
+import struct
 from dataclasses import dataclass
-from typing import Optional
 
-from PySide6.QtCore import QObject, Signal, Slot, QTimer
-from PySide6.QtNetwork import QUdpSocket, QHostAddress, QNetworkInterface
-
+from PySide6.QtCore import QObject, QTimer, Signal, Slot
+from PySide6.QtNetwork import QHostAddress, QUdpSocket
 from qtm_rt.packet import QRTPacketType, RTheader
 
 LOG = logging.getLogger("qtm_rt_pyside6")
@@ -23,9 +21,10 @@ QRT_DISCOVERY_PORT = 22226
 @dataclass
 class QTMDiscoveryResponse:
     """Information about a discovered QTM instance."""
-    info: str       # QTM info string (hostname, version, etc.)
-    host: str       # IP address
-    port: int       # Base port number
+
+    info: str  # QTM info string (hostname, version, etc.)
+    host: str  # IP address
+    port: int  # Base port number
 
 
 class QTMDiscovery(QObject):
@@ -45,7 +44,7 @@ class QTMDiscovery(QObject):
     discovered = Signal(object)  # QTMDiscoveryResponse
     finished = Signal()
 
-    def __init__(self, parent: Optional[QObject] = None, timeout_ms: int = 1000):
+    def __init__(self, parent: QObject | None = None, timeout_ms: int = 1000):
         """Initialize QTM discovery.
 
         Args:
@@ -55,14 +54,14 @@ class QTMDiscovery(QObject):
         super().__init__(parent)
 
         self._timeout_ms = timeout_ms
-        self._socket: Optional[QUdpSocket] = None
+        self._socket: QUdpSocket | None = None
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
         self._timer.timeout.connect(self._onTimeout)
         self._local_port: int = 0
 
     @Slot()
-    def start(self, interface: Optional[str] = None):
+    def start(self, interface: str | None = None):
         """Start discovery.
 
         Args:
@@ -110,13 +109,9 @@ class QTMDiscovery(QObject):
         if self._socket is None or self._local_port == 0:
             return
 
-        packet = (
-            QRT_DISCOVERY_P1.pack(
-                QRT_DISCOVERY_PACKET_SIZE,
-                QRTPacketType.PacketDiscover.value
-            )
-            + QRT_DISCOVERY_P2.pack(self._local_port)
-        )
+        packet = QRT_DISCOVERY_P1.pack(
+            QRT_DISCOVERY_PACKET_SIZE, QRTPacketType.PacketDiscover.value
+        ) + QRT_DISCOVERY_P2.pack(self._local_port)
 
         broadcast_addr = QHostAddress.Broadcast
         bytes_sent = self._socket.writeDatagram(packet, broadcast_addr, QRT_DISCOVERY_PORT)
@@ -129,9 +124,7 @@ class QTMDiscovery(QObject):
     def _onReadyRead(self):
         """Handle incoming UDP datagram."""
         while self._socket and self._socket.hasPendingDatagrams():
-            datagram, host, port = self._socket.readDatagram(
-                self._socket.pendingDatagramSize()
-            )
+            datagram, host, port = self._socket.readDatagram(self._socket.pendingDatagramSize())
 
             if not datagram:
                 continue
@@ -139,13 +132,12 @@ class QTMDiscovery(QObject):
             try:
                 response = self._parseResponse(datagram, host.toString())
                 if response:
-                    LOG.debug("Discovered QTM: %s at %s:%d",
-                             response.info, response.host, response.port)
+                    LOG.debug("Discovered QTM: %s at %s:%d", response.info, response.host, response.port)
                     self.discovered.emit(response)
             except Exception as e:
                 LOG.warning("Failed to parse discovery response: %s", e)
 
-    def _parseResponse(self, datagram: bytes, host: str) -> Optional[QTMDiscoveryResponse]:
+    def _parseResponse(self, datagram: bytes, host: str) -> QTMDiscoveryResponse | None:
         """Parse discovery response datagram."""
         if len(datagram) < RTheader.size + 3:
             return None

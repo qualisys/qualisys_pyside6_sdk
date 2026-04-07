@@ -1,13 +1,12 @@
 """QTM Connection using Qt network stack"""
 
-import struct
 import logging
-from typing import Optional, Callable, List
+import struct
+from collections.abc import Callable
 
 from PySide6.QtCore import QObject, Signal, Slot
-from PySide6.QtNetwork import QTcpSocket, QAbstractSocket
-
-from qtm_rt.packet import QRTPacketType, QRTPacket, QRTEvent, RTheader, RTCommand
+from PySide6.QtNetwork import QAbstractSocket, QTcpSocket
+from qtm_rt.packet import QRTEvent, QRTPacket, QRTPacketType, RTCommand, RTheader
 from qtm_rt.receiver import Receiver
 
 LOG = logging.getLogger("qtm_rt_pyside6")
@@ -38,28 +37,52 @@ class QTMConnection(QObject):
 
     # Streaming signals
     packetReceived = Signal(object)  # QRTPacket
-    eventReceived = Signal(object)   # QRTEvent
+    eventReceived = Signal(object)  # QRTEvent
 
     # Command response signal (command_name, data)
     responseReceived = Signal(str, object)
 
     # Valid components for streaming
     VALID_COMPONENTS = {
-        "2d", "2dlin", "3d", "3dres", "3dnolabels", "3dnolabelsres",
-        "analog", "analogsingle", "force", "forcesingle",
-        "6d", "6dres", "6deuler", "6deulerres",
-        "gazevector", "eyetracker", "image", "timecode",
-        "skeleton", "skeleton:global"
+        "2d",
+        "2dlin",
+        "3d",
+        "3dres",
+        "3dnolabels",
+        "3dnolabelsres",
+        "analog",
+        "analogsingle",
+        "force",
+        "forcesingle",
+        "6d",
+        "6dres",
+        "6deuler",
+        "6deulerres",
+        "gazevector",
+        "eyetracker",
+        "image",
+        "timecode",
+        "skeleton",
+        "skeleton:global",
     }
 
     # Valid parameters for getParameters
     VALID_PARAMETERS = {
-        "all", "general", "3d", "6d", "analog", "force",
-        "gazevector", "eyetracker", "image",
-        "skeleton", "skeleton:global", "calibration"
+        "all",
+        "general",
+        "3d",
+        "6d",
+        "analog",
+        "force",
+        "gazevector",
+        "eyetracker",
+        "image",
+        "skeleton",
+        "skeleton:global",
+        "calibration",
     }
 
-    def __init__(self, parent: Optional[QObject] = None):
+    def __init__(self, parent: QObject | None = None):
         super().__init__(parent)
 
         self._socket = QTcpSocket(self)
@@ -69,7 +92,7 @@ class QTMConnection(QObject):
         self._socket.errorOccurred.connect(self._onSocketError)
 
         self._version = "1.25"
-        self._pending_command: Optional[str] = None
+        self._pending_command: str | None = None
         self._streaming = False
         self._response_callbacks: dict[str, Callable] = {}
 
@@ -125,7 +148,7 @@ class QTMConnection(QObject):
         self._sendCommand("getstate", expect_response=False)
 
     @Slot(list)
-    def getParameters(self, parameters: Optional[List[str]] = None):
+    def getParameters(self, parameters: list[str] | None = None):
         """Request QTM parameters in XML format.
 
         Args:
@@ -148,7 +171,7 @@ class QTMConnection(QObject):
         self._sendCommand(cmd)
 
     @Slot(list)
-    def getCurrentFrame(self, components: List[str]):
+    def getCurrentFrame(self, components: list[str]):
         """Request a single frame of data.
 
         Args:
@@ -163,7 +186,7 @@ class QTMConnection(QObject):
         self._sendCommand(cmd)
 
     @Slot(str, list)
-    def streamFrames(self, components: List[str], frames: str = "allframes"):
+    def streamFrames(self, components: list[str], frames: str = "allframes"):
         """Start streaming frames from QTM.
 
         Args:
@@ -289,7 +312,7 @@ class QTMConnection(QObject):
         self._sendCommand("trig")
 
     @Slot(str)
-    def setQtmEvent(self, event: Optional[str] = None):
+    def setQtmEvent(self, event: str | None = None):
         """Set an event in QTM.
 
         Args:
@@ -344,7 +367,7 @@ class QTMConnection(QObject):
     # Private methods
     # -------------------------------------------------------------------------
 
-    def _validateComponents(self, components: List[str]) -> bool:
+    def _validateComponents(self, components: list[str]) -> bool:
         """Validate component list."""
         for comp in components:
             if comp.lower() not in self.VALID_COMPONENTS:
@@ -352,8 +375,9 @@ class QTMConnection(QObject):
                 return False
         return True
 
-    def _sendCommand(self, command: str, expect_response: bool = True,
-                     command_type: QRTPacketType = QRTPacketType.PacketCommand):
+    def _sendCommand(
+        self, command: str, expect_response: bool = True, command_type: QRTPacketType = QRTPacketType.PacketCommand
+    ):
         """Send a command to QTM."""
         if not self.isConnected():
             self.error.emit("Not connected")

@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=68.0", "setuptools-scm>=8.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qtm-rt-pyside6"
+dynamic = ["version"]
+description = "PySide6 SDK for QTM Real-Time Protocol"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE", "THIRD_PARTY_LICENSES"]
+requires-python = ">=3.10"
+authors = [{ name = "Qualisys AB", email = "support@qualisys.com" }]
+classifiers = [
+    "Operating System :: OS Independent",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Utilities",
+]
+dependencies = ["PySide6>=6.0.0"]
+
+[project.urls]
+Homepage = "https://github.com/qualisys/qualisys_pyside6_sdk"
+
+[tool.setuptools_scm]
+version_scheme = "guess-next-dev"
+local_scheme = "no-local-version"
+
+[tool.setuptools.packages.find]
+include = ["qtm_rt_pyside6*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+qt_api = "pyside6"
+
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+extend-exclude = ["qtm_rt"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "B008",   # function call in default arg — common Qt pattern (QModelIndex())
+    "SIM108", # ternary operator — not always more readable
+]

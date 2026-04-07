@@ -9,16 +9,26 @@ Features:
 """
 
 import sys
-from typing import Optional
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QPushButton, QLineEdit, QLabel, QTableWidget, QTableWidgetItem,
-    QComboBox, QGroupBox, QStatusBar, QHeaderView, QSpinBox
+    QApplication,
+    QComboBox,
+    QGroupBox,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QMainWindow,
+    QPushButton,
+    QSpinBox,
+    QStatusBar,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
 )
 
-from qtm_rt_pyside6 import QTMConnection, QTMDiscovery, QRTPacket
+from qtm_rt_pyside6 import QRTPacket, QTMConnection, QTMDiscovery
 
 
 class MainWindow(QMainWindow):
@@ -273,7 +283,7 @@ class MainWindow(QMainWindow):
             self.table.setColumnCount(4)
             self.table.setHorizontalHeaderLabels(["Index", "X", "Y", "Z"])
 
-            for i, (pos, rotation) in enumerate(bodies):
+            for i, (pos, _rotation) in enumerate(bodies):
                 self.table.setItem(i, 0, QTableWidgetItem(str(i)))
                 self.table.setItem(i, 1, QTableWidgetItem(f"{pos.x:.1f}"))
                 self.table.setItem(i, 2, QTableWidgetItem(f"{pos.y:.1f}"))
