@@ -448,8 +448,10 @@ class QTMConnection(QObject):
         else:
             # Single frame request response
             if self._pending_command:
-                self._emitResponse(self._pending_command, packet)
+                # Save and clear before emitting to avoid reentrancy issues
+                cmd = self._pending_command
                 self._pending_command = None
+                self._emitResponse(cmd, packet)
 
     def _onNoMoreData(self, data):
         """Handle no more data packet (end of file during RT from file)."""
