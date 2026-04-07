@@ -83,7 +83,7 @@ class QTMConnection(QObject):
         "calibration",
     }
 
-    def __init__(self, parent: QObject | None = None):
+    def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
 
         self._socket = QTcpSocket(self)
@@ -117,7 +117,7 @@ class QTMConnection(QObject):
     # -------------------------------------------------------------------------
 
     @Slot(str, int)
-    def connectToHost(self, host: str, port: int = 22223, version: str = "1.25", timeout_ms: int = 5000):
+    def connectToHost(self, host: str, port: int = 22223, version: str = "1.25", timeout_ms: int = 5000) -> None:
         """Connect to QTM at the specified host and port.
 
         Args:
@@ -126,14 +126,16 @@ class QTMConnection(QObject):
             version: Protocol version (default "1.25")
             timeout_ms: Connection timeout in milliseconds (default 5000). Set to 0 to disable.
         """
+        LOG.info("Connecting to %s:%d", host, port)
         self._version = version
         if timeout_ms > 0:
             self._connect_timer.start(timeout_ms)
         self._socket.connectToHost(host, port)
 
     @Slot()
-    def disconnect(self):
+    def disconnect(self) -> None:
         """Disconnect from QTM."""
+        LOG.info("Disconnecting")
         self._socket.disconnectFromHost()
 
     def isConnected(self) -> bool:
@@ -141,22 +143,22 @@ class QTMConnection(QObject):
         return self._socket.state() == QAbstractSocket.SocketState.ConnectedState
 
     @Slot()
-    def getQtmVersion(self):
+    def getQtmVersion(self) -> None:
         """Request QTM version. Response via responseReceived("qtmversion", str)."""
         self._sendCommand("qtmversion")
 
     @Slot()
-    def getByteOrder(self):
+    def getByteOrder(self) -> None:
         """Request byte order. Response via responseReceived("byteorder", str)."""
         self._sendCommand("byteorder")
 
     @Slot()
-    def getState(self):
+    def getState(self) -> None:
         """Request current QTM state. Response via eventReceived(QRTEvent)."""
         self._sendCommand("getstate", expect_response=False)
 
     @Slot(list)
-    def getParameters(self, parameters: list[str] | None = None):
+    def getParameters(self, parameters: list[str] | None = None) -> None:
         """Request QTM parameters in XML format.
 
         Args:
@@ -179,7 +181,7 @@ class QTMConnection(QObject):
         self._sendCommand(cmd)
 
     @Slot(list)
-    def getCurrentFrame(self, components: list[str]):
+    def getCurrentFrame(self, components: list[str]) -> None:
         """Request a single frame of data.
 
         Args:
@@ -194,7 +196,7 @@ class QTMConnection(QObject):
         self._sendCommand(cmd)
 
     @Slot(str, list)
-    def streamFrames(self, components: list[str], frames: str = "allframes"):
+    def streamFrames(self, components: list[str], frames: str = "allframes") -> None:
         """Start streaming frames from QTM.
 
         Args:
@@ -216,13 +218,13 @@ class QTMConnection(QObject):
         self._sendCommand(cmd)
 
     @Slot()
-    def streamFramesStop(self):
+    def streamFramesStop(self) -> None:
         """Stop streaming frames."""
         self._streaming = False
         self._sendCommand("streamframes stop", expect_response=False)
 
     @Slot(str)
-    def takeControl(self, password: str):
+    def takeControl(self, password: str) -> None:
         """Take control of QTM.
 
         Args:
@@ -233,7 +235,7 @@ class QTMConnection(QObject):
         self._sendCommand(f"takecontrol {password}")
 
     @Slot()
-    def releaseControl(self):
+    def releaseControl(self) -> None:
         """Release control of QTM.
 
         Response via responseReceived("releasecontrol", bytes).
@@ -241,7 +243,7 @@ class QTMConnection(QObject):
         self._sendCommand("releasecontrol")
 
     @Slot()
-    def newMeasurement(self):
+    def newMeasurement(self) -> None:
         """Create a new measurement. Requires control.
 
         Response via responseReceived("new", bytes).
@@ -249,7 +251,7 @@ class QTMConnection(QObject):
         self._sendCommand("new")
 
     @Slot()
-    def closeMeasurement(self):
+    def closeMeasurement(self) -> None:
         """Close current measurement.
 
         Response via responseReceived("close", bytes).
@@ -257,7 +259,7 @@ class QTMConnection(QObject):
         self._sendCommand("close")
 
     @Slot(bool)
-    def start(self, rtFromFile: bool = False):
+    def start(self, rtFromFile: bool = False) -> None:
         """Start measurement or RT from file. Requires control.
 
         Args:
@@ -269,7 +271,7 @@ class QTMConnection(QObject):
         self._sendCommand(cmd)
 
     @Slot()
-    def stop(self):
+    def stop(self) -> None:
         """Stop measurement or RT from file.
 
         Response via responseReceived("stop", bytes).
@@ -277,7 +279,7 @@ class QTMConnection(QObject):
         self._sendCommand("stop")
 
     @Slot(str)
-    def load(self, filename: str):
+    def load(self, filename: str) -> None:
         """Load a measurement file.
 
         Args:
@@ -288,7 +290,7 @@ class QTMConnection(QObject):
         self._sendCommand(f"load {filename}")
 
     @Slot(str, bool)
-    def save(self, filename: str, overwrite: bool = False):
+    def save(self, filename: str, overwrite: bool = False) -> None:
         """Save current measurement.
 
         Args:
@@ -301,7 +303,7 @@ class QTMConnection(QObject):
         self._sendCommand(cmd)
 
     @Slot(str)
-    def loadProject(self, projectPath: str):
+    def loadProject(self, projectPath: str) -> None:
         """Load a QTM project.
 
         Args:
@@ -312,7 +314,7 @@ class QTMConnection(QObject):
         self._sendCommand(f"loadproject {projectPath}")
 
     @Slot()
-    def trig(self):
+    def trig(self) -> None:
         """Trigger QTM (for software/wireless trigger mode).
 
         Response via responseReceived("trig", bytes).
@@ -320,7 +322,7 @@ class QTMConnection(QObject):
         self._sendCommand("trig")
 
     @Slot(str)
-    def setQtmEvent(self, event: str | None = None):
+    def setQtmEvent(self, event: str | None = None) -> None:
         """Set an event in QTM.
 
         Args:
@@ -332,7 +334,7 @@ class QTMConnection(QObject):
         self._sendCommand(cmd)
 
     @Slot(str)
-    def sendXml(self, xml: str):
+    def sendXml(self, xml: str) -> None:
         """Send XML settings to QTM.
 
         Args:
@@ -343,7 +345,7 @@ class QTMConnection(QObject):
         self._sendCommand(xml, command_type=QRTPacketType.PacketXML)
 
     @Slot()
-    def calibrate(self):
+    def calibrate(self) -> None:
         """Start calibration. Response comes via responseReceived("calibrate", xml).
 
         Note: Calibration can take several minutes. The response will arrive
@@ -351,7 +353,7 @@ class QTMConnection(QObject):
         """
         self._sendCommand("calibrate")
 
-    def onResponse(self, command: str, callback: Callable):
+    def onResponse(self, command: str, callback: Callable) -> None:
         """Register a callback for a specific command response.
 
         This is a convenience method for cleaner code when you only care
@@ -367,7 +369,7 @@ class QTMConnection(QObject):
         """
         self._response_callbacks[command.lower()] = callback
 
-    def removeResponseCallback(self, command: str):
+    def removeResponseCallback(self, command: str) -> None:
         """Remove a response callback."""
         self._response_callbacks.pop(command.lower(), None)
 
@@ -385,7 +387,7 @@ class QTMConnection(QObject):
 
     def _sendCommand(
         self, command: str, expect_response: bool = True, command_type: QRTPacketType = QRTPacketType.PacketCommand
-    ):
+    ) -> None:
         """Send a command to QTM."""
         if not self.isConnected():
             self.error.emit("Not connected")
@@ -409,7 +411,7 @@ class QTMConnection(QObject):
         LOG.debug("Sending: %s", command)
         self._socket.write(packet)
 
-    def _emitResponse(self, command: str, data):
+    def _emitResponse(self, command: str, data: object) -> None:
         """Emit response via signal and/or callback."""
         self.responseReceived.emit(command, data)
 
@@ -421,14 +423,14 @@ class QTMConnection(QObject):
     # Socket event handlers
     # -------------------------------------------------------------------------
 
-    def _onSocketConnected(self):
+    def _onSocketConnected(self) -> None:
         """Handle socket connected - negotiate protocol version."""
         self._connect_timer.stop()
         LOG.info("Socket connected, negotiating version %s", self._version)
         self._command_queue.append("version")
         self._sendCommand(f"version {self._version}")
 
-    def _onSocketDisconnected(self):
+    def _onSocketDisconnected(self) -> None:
         """Handle socket disconnected."""
         self._connect_timer.stop()
         LOG.info("Disconnected")
@@ -438,21 +440,21 @@ class QTMConnection(QObject):
         self._receiver = Receiver(self._handlers)
         self.disconnected.emit()
 
-    def _onSocketError(self, error: QAbstractSocket.SocketError):
+    def _onSocketError(self, error: QAbstractSocket.SocketError) -> None:
         """Handle socket error."""
         self._connect_timer.stop()
         error_string = self._socket.errorString()
         LOG.error("Socket error: %s", error_string)
         self.error.emit(error_string)
 
-    def _onConnectTimeout(self):
+    def _onConnectTimeout(self) -> None:
         """Handle connection timeout."""
         if not self.isConnected():
             LOG.error("Connection timed out")
             self._socket.abort()
             self.error.emit("Connection timed out")
 
-    def _onReadyRead(self):
+    def _onReadyRead(self) -> None:
         """Handle incoming data."""
         data = self._socket.readAll().data()
         self._receiver.data_received(data)
@@ -461,7 +463,7 @@ class QTMConnection(QObject):
     # Packet handlers (called by Receiver)
     # -------------------------------------------------------------------------
 
-    def _onData(self, packet: QRTPacket):
+    def _onData(self, packet: QRTPacket) -> None:
         """Handle data packet."""
         if self._streaming:
             self.packetReceived.emit(packet)
@@ -471,16 +473,16 @@ class QTMConnection(QObject):
                 cmd = self._command_queue.popleft()
                 self._emitResponse(cmd, packet)
 
-    def _onNoMoreData(self, data):
+    def _onNoMoreData(self, data: bytes) -> None:
         """Handle no more data packet (end of file during RT from file)."""
         LOG.debug("No more data")
 
-    def _onEvent(self, event: QRTEvent):
+    def _onEvent(self, event: QRTEvent) -> None:
         """Handle event packet."""
         LOG.info("Event: %s", event)
         self.eventReceived.emit(event)
 
-    def _onError(self, response: bytes):
+    def _onError(self, response: bytes) -> None:
         """Handle error packet."""
         error_msg = response.decode("utf-8", errors="replace")
         LOG.error("QTM error: %s", error_msg)
@@ -490,7 +492,7 @@ class QTMConnection(QObject):
             self._command_queue.popleft()
         self.error.emit(error_msg)
 
-    def _onXml(self, response: bytes):
+    def _onXml(self, response: bytes) -> None:
         """Handle XML response."""
         xml_str = response.decode("utf-8", errors="replace")
         LOG.debug("XML response: %s...", xml_str[:70])
@@ -499,7 +501,7 @@ class QTMConnection(QObject):
             cmd = self._command_queue.popleft()
             self._emitResponse(cmd, xml_str)
 
-    def _onCommand(self, response: bytes):
+    def _onCommand(self, response: bytes) -> None:
         """Handle command response."""
         response_str = response.decode("utf-8", errors="replace")
         LOG.debug("Response: %s", response_str)

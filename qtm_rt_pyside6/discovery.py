@@ -44,7 +44,7 @@ class QTMDiscovery(QObject):
     discovered = Signal(object)  # QTMDiscoveryResponse
     finished = Signal()
 
-    def __init__(self, parent: QObject | None = None, timeout_ms: int = 1000):
+    def __init__(self, parent: QObject | None = None, timeout_ms: int = 1000) -> None:
         """Initialize QTM discovery.
 
         Args:
@@ -61,7 +61,7 @@ class QTMDiscovery(QObject):
         self._local_port: int = 0
 
     @Slot()
-    def start(self, interface: str | None = None):
+    def start(self, interface: str | None = None) -> None:
         """Start discovery.
 
         Args:
@@ -95,7 +95,7 @@ class QTMDiscovery(QObject):
         self._timer.start(self._timeout_ms)
 
     @Slot()
-    def stop(self):
+    def stop(self) -> None:
         """Stop discovery."""
         self._timer.stop()
 
@@ -104,7 +104,7 @@ class QTMDiscovery(QObject):
             self._socket.deleteLater()
             self._socket = None
 
-    def _sendDiscoveryPacket(self):
+    def _sendDiscoveryPacket(self) -> None:
         """Send broadcast discovery packet."""
         if self._socket is None or self._local_port == 0:
             return
@@ -121,7 +121,7 @@ class QTMDiscovery(QObject):
         else:
             LOG.debug("Sent discovery packet to broadcast:%d", QRT_DISCOVERY_PORT)
 
-    def _onReadyRead(self):
+    def _onReadyRead(self) -> None:
         """Handle incoming UDP datagram."""
         while self._socket and self._socket.hasPendingDatagrams():
             datagram, host, port = self._socket.readDatagram(self._socket.pendingDatagramSize())
@@ -167,7 +167,7 @@ class QTMDiscovery(QObject):
 
         return QTMDiscoveryResponse(info=info, host=host, port=base_port)
 
-    def _onTimeout(self):
+    def _onTimeout(self) -> None:
         """Handle discovery timeout."""
         LOG.debug("Discovery timeout")
         self.stop()
