@@ -30,6 +30,7 @@ app = QCoreApplication(sys.argv)
 connection = QTMConnection()
 connection.connected.connect(lambda: connection.streamFrames(["3d"]))
 connection.packetReceived.connect(on_packet)
+connection.error.connect(lambda msg: print(f"Error: {msg}"))
 connection.connectToHost("127.0.0.1")
 
 sys.exit(app.exec())
@@ -62,7 +63,7 @@ discovery.start()
 
 ### QTMConnection Methods
 
-- `connectToHost(host, port=22223)` - Connect to QTM
+- `connectToHost(host, port=22223, timeout_ms=5000)` - Connect to QTM
 - `disconnect()` - Disconnect
 - `streamFrames(components, frames="allframes")` - Start streaming
 - `streamFramesStop()` - Stop streaming
@@ -86,6 +87,12 @@ The [examples/](examples/) directory contains ready-to-run scripts (requires QTM
 - **parameters_example.py** - Get QTM configuration as XML
 - **gui_example.py** - Qt Widgets GUI with data table
 - **gui_3d_example/** - Qt Quick 3D visualization with orbit camera
+
+## Known Limitations
+
+- **No automatic reconnection.** If the connection drops, you must call `connectToHost()` again. Listen to the `disconnected` signal to detect this.
+- **Single-threaded.** `QTMConnection` and `QTMDiscovery` are `QObject` subclasses and must be used from the thread that created them (typically the main thread). Use Qt signals for cross-thread communication.
+- **Password sent in plain text.** `takeControl(password)` transmits the password unencrypted over TCP. This is a QTM protocol limitation — use on trusted networks only.
 
 ## Development
 
