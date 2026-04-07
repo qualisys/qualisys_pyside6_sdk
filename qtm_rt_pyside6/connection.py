@@ -2,6 +2,7 @@
 
 import logging
 import struct
+from collections import deque
 from collections.abc import Callable
 
 from PySide6.QtCore import QObject, Signal, Slot
@@ -92,7 +93,7 @@ class QTMConnection(QObject):
         self._socket.errorOccurred.connect(self._onSocketError)
 
         self._version = "1.25"
-        self._pending_command: str | None = None
+        self._command_queue: deque[str] = deque()
         self._streaming = False
         self._response_callbacks: dict[str, Callable] = {}
 
@@ -395,8 +396,8 @@ class QTMConnection(QObject):
         )
 
         if expect_response:
-            # Store command name for matching response
-            self._pending_command = command.split()[0].lower()
+            # Queue command name for matching response
+            self._command_queue.append(command.split()[0].lower())
 
         LOG.debug("Sending: %s", command)
         self._socket.write(packet)
@@ -416,14 +417,14 @@ class QTMConnection(QObject):
     def _onSocketConnected(self):
         """Handle socket connected - negotiate protocol version."""
         LOG.info("Socket connected, negotiating version %s", self._version)
-        self._pending_command = "version"
+        self._command_queue.append("version")
         self._sendCommand(f"version {self._version}")
 
     def _onSocketDisconnected(self):
         """Handle socket disconnected."""
         LOG.info("Disconnected")
         self._streaming = False
-        self._pending_command = None
+        self._command_queue.clear()
         self._response_callbacks.clear()
         self._receiver = Receiver(self._handlers)
         self.disconnected.emit()
@@ -449,10 +450,8 @@ class QTMConnection(QObject):
             self.packetReceived.emit(packet)
         else:
             # Single frame request response
-            if self._pending_command:
-                # Save and clear before emitting to avoid reentrancy issues
-                cmd = self._pending_command
-                self._pending_command = None
+            if self._command_queue:
+                cmd = self._command_queue.popleft()
                 self._emitResponse(cmd, packet)
 
     def _onNoMoreData(self, data):
@@ -469,18 +468,18 @@ class QTMConnection(QObject):
         error_msg = response.decode("utf-8", errors="replace")
         LOG.error("QTM error: %s", error_msg)
         self._streaming = False
+        # Discard the command that caused the error
+        if self._command_queue:
+            self._command_queue.popleft()
         self.error.emit(error_msg)
-        self._pending_command = None
 
     def _onXml(self, response: bytes):
         """Handle XML response."""
         xml_str = response.decode("utf-8", errors="replace")
         LOG.debug("XML response: %s...", xml_str[:70])
 
-        if self._pending_command:
-            # Save and clear before emitting to avoid reentrancy issues
-            cmd = self._pending_command
-            self._pending_command = None
+        if self._command_queue:
+            cmd = self._command_queue.popleft()
             self._emitResponse(cmd, xml_str)
 
     def _onCommand(self, response: bytes):
@@ -493,17 +492,15 @@ class QTMConnection(QObject):
             return
 
         # Handle version negotiation
-        if self._pending_command == "version":
+        if self._command_queue and self._command_queue[0] == "version":
+            self._command_queue.popleft()
             if response_str.startswith("Version set to"):
                 LOG.info("Connected with protocol %s", self._version)
-                self._pending_command = None
                 self.connected.emit()
             else:
                 self.error.emit(f"Version negotiation failed: {response_str}")
             return
 
-        if self._pending_command:
-            # Save and clear before emitting to avoid reentrancy issues
-            cmd = self._pending_command
-            self._pending_command = None
+        if self._command_queue:
+            cmd = self._command_queue.popleft()
             self._emitResponse(cmd, response)
