@@ -424,6 +424,8 @@ class QTMConnection(QObject):
         LOG.info("Disconnected")
         self._streaming = False
         self._pending_command = None
+        self._response_callbacks.clear()
+        self._receiver = Receiver(self._handlers)
         self.disconnected.emit()
 
     def _onSocketError(self, error: QAbstractSocket.SocketError):
