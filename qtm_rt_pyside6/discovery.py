@@ -144,6 +144,14 @@ class QTMDiscovery(QObject):
 
         size, packet_type = RTheader.unpack_from(datagram, 0)
 
+        # Validate packet
+        if size > len(datagram) or size < RTheader.size + 3:
+            LOG.warning("Invalid discovery packet size: %d (datagram length: %d)", size, len(datagram))
+            return None
+
+        if packet_type != QRTPacketType.PacketDiscover.value:
+            return None
+
         # Extract info string (null-terminated, before the 2-byte port at end)
         info_end = size - 3  # -1 for null terminator, -2 for port
         info_start = RTheader.size
@@ -152,6 +160,10 @@ class QTMDiscovery(QObject):
 
         # Extract base port (last 2 bytes, big endian)
         base_port = QRT_DISCOVERY_BASE_PORT.unpack_from(datagram, size - 2)[0]
+
+        # Normalize IPv6-mapped IPv4 addresses (e.g., ::ffff:192.168.1.1 -> 192.168.1.1)
+        if host.startswith("::ffff:"):
+            host = host[7:]
 
         return QTMDiscoveryResponse(info=info, host=host, port=base_port)
 
