@@ -155,7 +155,13 @@ class QTMDiscovery(QObject):
         # Extract info string (null-terminated, before the 2-byte port at end)
         info_end = size - 3  # -1 for null terminator, -2 for port
         info_start = RTheader.size
-        info = struct.unpack_from(f"{info_end - info_start}s", datagram, info_start)[0]
+        info_length = info_end - info_start
+
+        if info_length < 0:
+            LOG.debug("Invalid info string length: %d", info_length)
+            return None
+
+        info = struct.unpack_from(f"{info_length}s", datagram, info_start)[0]
         info = info.decode("utf-8", errors="replace").rstrip("\x00")
 
         # Extract base port (last 2 bytes, big endian)

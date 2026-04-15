@@ -195,7 +195,7 @@ class QTMConnection(QObject):
         cmd = f"getcurrentframe {' '.join(components)}"
         self._sendCommand(cmd)
 
-    @Slot(str, list)
+    @Slot(list, str)
     def streamFrames(self, components: list[str], frames: str = "allframes") -> None:
         """Start streaming frames from QTM.
 
@@ -340,9 +340,10 @@ class QTMConnection(QObject):
         Args:
             xml: XML document string.
 
-        Response via responseReceived("xml", bytes).
+        Response via responseReceived("xml", str).
         """
-        self._sendCommand(xml, command_type=QRTPacketType.PacketXML)
+        self._sendCommand(xml, command_type=QRTPacketType.PacketXML,
+                          command_name="xml")
 
     @Slot()
     def calibrate(self) -> None:
@@ -386,7 +387,11 @@ class QTMConnection(QObject):
         return True
 
     def _sendCommand(
-        self, command: str, expect_response: bool = True, command_type: QRTPacketType = QRTPacketType.PacketCommand
+        self,
+        command: str,
+        expect_response: bool = True,
+        command_type: QRTPacketType = QRTPacketType.PacketCommand,
+        command_name: str | None = None,
     ) -> None:
         """Send a command to QTM."""
         if not self.isConnected():
@@ -405,8 +410,8 @@ class QTMConnection(QObject):
         )
 
         if expect_response:
-            # Queue command name for matching response
-            self._command_queue.append(command.split()[0].lower())
+            name = command_name or command.split()[0].lower()
+            self._command_queue.append(name)
 
         LOG.debug("Sending: %s", command)
         self._socket.write(packet)
@@ -427,7 +432,6 @@ class QTMConnection(QObject):
         """Handle socket connected - negotiate protocol version."""
         self._connect_timer.stop()
         LOG.info("Socket connected, negotiating version %s", self._version)
-        self._command_queue.append("version")
         self._sendCommand(f"version {self._version}")
 
     def _onSocketDisconnected(self) -> None:
@@ -465,13 +469,15 @@ class QTMConnection(QObject):
 
     def _onData(self, packet: QRTPacket) -> None:
         """Handle data packet."""
-        if self._streaming:
+        # Check if this is a response to getCurrentFrame
+        if self._command_queue and self._command_queue[0] == "getcurrentframe":
+            cmd = self._command_queue.popleft()
+            self._emitResponse(cmd, packet)
+        elif self._streaming:
             self.packetReceived.emit(packet)
-        else:
-            # Single frame request response
-            if self._command_queue:
-                cmd = self._command_queue.popleft()
-                self._emitResponse(cmd, packet)
+        elif self._command_queue:
+            cmd = self._command_queue.popleft()
+            self._emitResponse(cmd, packet)
 
     def _onNoMoreData(self, data: bytes) -> None:
         """Handle no more data packet (end of file during RT from file)."""
@@ -522,4 +528,4 @@ class QTMConnection(QObject):
 
         if self._command_queue:
             cmd = self._command_queue.popleft()
-            self._emitResponse(cmd, response)
+            self._emitResponse(cmd, response_str)
