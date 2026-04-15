@@ -22,7 +22,7 @@ classifiers = [
     "Topic :: Scientific/Engineering",
     "Topic :: Utilities",
 ]
-dependencies = ["PySide6>=6.0.0"]
+dependencies = ["PySide6>=6.0.0", "qtm-rt>=3.0.0"]
 
 [project.urls]
 Homepage = "https://github.com/qualisys/qualisys_pyside6_sdk"
