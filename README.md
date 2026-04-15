@@ -4,11 +4,26 @@ PySide6-based SDK for the Qualisys Real-Time (RT) protocol. Stream motion captur
 
 ## Installation
 
+Requires Python 3.10+ and PySide6 6.0+.
+
+We recommend using a virtual environment to avoid conflicts with other packages:
+
+```bash
+# Create and activate a virtual environment
+python -m venv .venv
+
+# Windows
+.venv\Scripts\activate
+
+# macOS / Linux
+source .venv/bin/activate
+```
+
+Then install the package:
+
 ```bash
 pip install qtm-rt-pyside6
 ```
-
-Requires Python 3.10+ and PySide6 6.0+.
 
 ## Quick Start
 
@@ -101,6 +116,17 @@ To work on the SDK itself:
 ```bash
 git clone --recursive https://github.com/qualisys/qualisys_pyside6_sdk.git
 cd qualisys_pyside6_sdk
+
+# Create and activate a virtual environment
+python -m venv .venv
+
+# Windows
+.venv\Scripts\activate
+
+# macOS / Linux
+source .venv/bin/activate
+
+# Install dependencies
 pip install -r requirements-dev.txt
 pip install -e .
 ```
