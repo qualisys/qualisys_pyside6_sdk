@@ -342,8 +342,7 @@ class QTMConnection(QObject):
 
         Response via responseReceived("xml", str).
         """
-        self._sendCommand(xml, command_type=QRTPacketType.PacketXML,
-                          command_name="xml")
+        self._sendCommand(xml, command_type=QRTPacketType.PacketXML, command_name="xml")
 
     @Slot()
     def calibrate(self) -> None:
