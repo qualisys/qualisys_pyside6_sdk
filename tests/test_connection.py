@@ -144,6 +144,7 @@ class TestQTMConnectionCommands:
             lambda: connection.setQtmEvent("test"),
             lambda: connection.sendXml("<xml/>"),
             lambda: connection.calibrate(),
+            lambda: connection.led(1, "on", "green"),
         ]
         for cmd in commands:
             with qtbot.waitSignal(connection.error):
@@ -313,6 +314,69 @@ class TestQTMConnectionCommandQueue:
         # Should not raise
         connection._onCommand(b"Unexpected response")
         connection._onXml(b"<Unexpected/>")
+
+
+class TestQTMConnectionQuit:
+    """Test quit command."""
+
+    def test_quit_when_not_connected(self, connection):
+        """Quit when not connected should just disconnect without error."""
+        connection.quit()  # Should not raise
+
+    def test_quit_emits_disconnect(self, connection, qtbot):
+        """Quit should trigger disconnected signal via socket disconnect."""
+        with qtbot.waitSignal(connection.disconnected):
+            connection._onSocketDisconnected()  # Simulate what quit triggers
+
+
+class TestQTMConnectionLed:
+    """Test LED control command."""
+
+    def test_led_invalid_mode_emits_error(self, connection, qtbot):
+        with qtbot.waitSignal(connection.error) as blocker:
+            connection.led(1, "blink", "green")
+        assert "Invalid LED mode" in blocker.args[0]
+
+    def test_led_invalid_color_emits_error(self, connection, qtbot):
+        with qtbot.waitSignal(connection.error) as blocker:
+            connection.led(1, "on", "blue")
+        assert "Invalid LED color" in blocker.args[0]
+
+    def test_led_valid_modes(self, connection):
+        """All valid modes should be accepted."""
+        for mode in ("on", "off", "pulsing"):
+            assert mode in connection.VALID_LED_MODES
+
+    def test_led_valid_colors(self, connection):
+        """All valid colors should be accepted."""
+        for color in ("green", "amber", "all"):
+            assert color in connection.VALID_LED_COLORS
+
+    def test_led_not_connected_emits_error(self, connection, qtbot):
+        with qtbot.waitSignal(connection.error):
+            connection.led(1, "on", "green")
+
+
+class TestQTMConnectionAnalogChannelSelection:
+    """Test analog channel selection in component validation."""
+
+    def test_analog_with_channels_valid(self, connection):
+        assert connection._validateComponents(["analog:1,3,5-8"])
+
+    def test_analogsingle_with_channels_valid(self, connection):
+        assert connection._validateComponents(["analogsingle:2,4"])
+
+    def test_invalid_base_with_channels_rejected(self, connection, qtbot):
+        with qtbot.waitSignal(connection.error):
+            result = connection._validateComponents(["invalid:1,2"])
+        assert not result
+
+    def test_skeleton_global_still_valid(self, connection):
+        """skeleton:global should still work (colon is part of component name)."""
+        assert connection._validateComponents(["skeleton:global"])
+
+    def test_mixed_components_with_channels(self, connection):
+        assert connection._validateComponents(["3d", "analog:1,3", "force"])
 
 
 class TestQTMConnectionDisconnect:

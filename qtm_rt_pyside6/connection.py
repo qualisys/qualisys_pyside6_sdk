@@ -67,6 +67,10 @@ class QTMConnection(QObject):
         "skeleton:global",
     }
 
+    # Valid LED modes and colors
+    VALID_LED_MODES = {"on", "off", "pulsing"}
+    VALID_LED_COLORS = {"green", "amber", "all"}
+
     # Valid parameters for getParameters
     VALID_PARAMETERS = {
         "all",
@@ -196,7 +200,13 @@ class QTMConnection(QObject):
         self._sendCommand(cmd)
 
     @Slot(list, str)
-    def streamFrames(self, components: list[str], frames: str = "allframes") -> None:
+    def streamFrames(
+        self,
+        components: list[str],
+        frames: str = "allframes",
+        udp_port: int | None = None,
+        udp_address: str | None = None,
+    ) -> None:
         """Start streaming frames from QTM.
 
         Args:
@@ -206,16 +216,29 @@ class QTMConnection(QObject):
                 '6d', '6dres', '6deuler', '6deulerres',
                 'gazevector', 'eyetracker', 'image', 'timecode',
                 'skeleton', 'skeleton:global'
+                Components may include channel selection suffix, e.g.,
+                'analog:1,3,5-8' or 'analogsingle:2,4'.
             frames: Frame selection - 'allframes', 'frequency:N', or 'frequencydivisor:N'
+            udp_port: Optional UDP port for UDP streaming (1023-65535).
+            udp_address: Optional UDP address. If udp_port is set but address is
+                omitted, frames are sent to the client's source IP.
 
-        Packets arrive via packetReceived(QRTPacket) signal.
+        Packets arrive via packetReceived(QRTPacket) signal (TCP) or on the
+        specified UDP port.
         """
         if not self._validateComponents(components):
             return
 
         self._streaming = True
-        cmd = f"streamframes {frames} {' '.join(components)}"
-        self._sendCommand(cmd)
+        parts = ["streamframes"]
+        if udp_port is not None:
+            if udp_address:
+                parts.append(f"udp:{udp_address}:{udp_port}")
+            else:
+                parts.append(f"udp:{udp_port}")
+        parts.append(frames)
+        parts.extend(components)
+        self._sendCommand(" ".join(parts))
 
     @Slot()
     def streamFramesStop(self) -> None:
@@ -353,6 +376,35 @@ class QTMConnection(QObject):
         """
         self._sendCommand("calibrate")
 
+    @Slot()
+    def quit(self) -> None:
+        """Send quit command and disconnect.
+
+        This ends the session with QTM and closes the socket.
+        """
+        if self.isConnected():
+            self._sendCommand("quit", expect_response=False)
+        self._socket.disconnectFromHost()
+
+    @Slot(int, str, str)
+    def led(self, camera: int, mode: str, color: str) -> None:
+        """Control Miqus camera LEDs.
+
+        Args:
+            camera: Camera number.
+            mode: LED mode - 'on', 'off', or 'pulsing'.
+            color: LED color - 'green', 'amber', or 'all'.
+
+        Response via responseReceived("led", str).
+        """
+        if mode.lower() not in self.VALID_LED_MODES:
+            self.error.emit(f"Invalid LED mode: {mode}")
+            return
+        if color.lower() not in self.VALID_LED_COLORS:
+            self.error.emit(f"Invalid LED color: {color}")
+            return
+        self._sendCommand(f"led {camera} {mode} {color}")
+
     def onResponse(self, command: str, callback: Callable) -> None:
         """Register a callback for a specific command response.
 
@@ -378,9 +430,14 @@ class QTMConnection(QObject):
     # -------------------------------------------------------------------------
 
     def _validateComponents(self, components: list[str]) -> bool:
-        """Validate component list."""
+        """Validate component list.
+
+        Components may include a channel selection suffix separated by a colon,
+        e.g., 'analog:1,3,5-8'. The base component before the colon is validated.
+        """
         for comp in components:
-            if comp.lower() not in self.VALID_COMPONENTS:
+            base = comp.split(":")[0].lower()
+            if base not in self.VALID_COMPONENTS:
                 self.error.emit(f"Invalid component: {comp}")
                 return False
         return True
