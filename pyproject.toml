@@ -44,7 +44,6 @@ qt_api = "pyside6"
 [tool.ruff]
 target-version = "py310"
 line-length = 120
-extend-exclude = ["qtm_rt"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM"]
