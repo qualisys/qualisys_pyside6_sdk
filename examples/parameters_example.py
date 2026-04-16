@@ -33,8 +33,8 @@ class ParametersApp:
         # Request version first
         self.connection.getQtmVersion()
 
-    def on_version(self, version: bytes):
-        print(f"QTM Version: {version.decode()}")
+    def on_version(self, version: str):
+        print(f"QTM Version: {version}")
         print()
         # Now request 3D, 6D, and skeleton parameters
         self.connection.getParameters(["3d", "6d", "skeleton"])
@@ -74,7 +74,7 @@ class ParametersApp:
             print(f"XML parse error: {e}")
 
         print()
-        self.connection.disconnect()
+        self.connection.disconnectFromHost()
 
     def on_disconnected(self):
         print("Disconnected")

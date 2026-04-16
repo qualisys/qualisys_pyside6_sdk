@@ -167,7 +167,7 @@ class MainWindow(QMainWindow):
         if self.connection.isConnected():
             if self._streaming:
                 self.toggle_stream()
-            self.connection.disconnect()
+            self.connection.disconnectFromHost()
         else:
             host = self.host_combo.currentText()
             port = self.port_spin.value()
@@ -299,7 +299,7 @@ class MainWindow(QMainWindow):
         if self._streaming:
             self.connection.streamFramesStop()
         if self.connection.isConnected():
-            self.connection.disconnect()
+            self.connection.disconnectFromHost()
         event.accept()
 
 

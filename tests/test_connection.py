@@ -109,6 +109,29 @@ class TestQTMConnectionCommands:
         with qtbot.waitSignal(connection.error):
             connection.streamFrames(["3d"])
 
+    def test_stream_frames_udp_not_connected_does_not_leak_state(self, connection, qtbot):
+        """streamFrames(..., udp_port=...) while not connected must not leave a
+        bound UDP socket or _streaming=True behind."""
+        assert not connection.isConnected()
+        with qtbot.waitSignal(connection.error) as blocker:
+            connection.streamFrames(["3d"], udp_port=22224)
+        assert blocker.args[0] == "Not connected"
+        assert connection._udp_socket is None
+        assert connection._udp_receiver is None
+        assert not connection._streaming
+
+    @pytest.mark.parametrize("bad_port", [-1, 0, 1022, 65536, 100000])
+    def test_stream_frames_rejects_out_of_range_udp_port(self, connection, qtbot, bad_port):
+        """udp_port must be inside the documented range. The OS would accept 0
+        (ephemeral bind) but QTM would receive 'udp:0' and never send frames,
+        so the caller gets a silent failure — reject up front."""
+        with qtbot.waitSignal(connection.error) as blocker:
+            connection.streamFrames(["3d"], udp_port=bad_port)
+        assert "udp_port must be between" in blocker.args[0]
+        # Validation happens before any state mutation.
+        assert connection._udp_socket is None
+        assert not connection._streaming
+
     def test_get_parameters_invalid_emits_error(self, connection, qtbot):
         with qtbot.waitSignal(connection.error):
             connection.getParameters(["invalid_param"])
@@ -143,7 +166,6 @@ class TestQTMConnectionCommands:
             lambda: connection.trig(),
             lambda: connection.setQtmEvent("test"),
             lambda: connection.sendXml("<xml/>"),
-            lambda: connection.calibrate(),
             lambda: connection.led(1, "on", "green"),
         ]
         for cmd in commands:
@@ -401,3 +423,93 @@ class TestQTMConnectionDisconnect:
     def test_disconnect_emits_signal(self, connection, qtbot):
         with qtbot.waitSignal(connection.disconnected):
             connection._onSocketDisconnected()
+
+    def test_disconnect_tears_down_udp_socket(self, connection):
+        """UDP receive socket should be released when the TCP socket drops."""
+        assert connection._setupUdpSocket(0)  # 0 = OS-assigned free port
+        assert connection._udp_socket is not None
+        connection._onSocketDisconnected()
+        assert connection._udp_socket is None
+        assert connection._udp_receiver is None
+
+
+class TestQTMConnectionUdpStreaming:
+    """Test UDP receive-socket lifecycle and packet routing."""
+
+    def test_no_udp_socket_by_default(self, connection):
+        assert connection._udp_socket is None
+        assert connection._udp_receiver is None
+
+    def test_setup_udp_socket_binds(self, connection):
+        """_setupUdpSocket on an ephemeral port should succeed and create a receiver."""
+        assert connection._setupUdpSocket(0)
+        assert connection._udp_socket is not None
+        assert connection._udp_receiver is not None
+        # Cleanup
+        connection._teardownUdpSocket()
+
+    def test_setup_udp_socket_bind_failure_emits_error(self, connection, qtbot):
+        """Binding an already-bound port should emit error and return False."""
+        from PySide6.QtNetwork import QHostAddress, QUdpSocket
+
+        # Occupy a port first
+        squatter = QUdpSocket()
+        assert squatter.bind(QHostAddress.AnyIPv4, 0)
+        port = squatter.localPort()
+
+        with qtbot.waitSignal(connection.error) as blocker:
+            ok = connection._setupUdpSocket(port)
+        assert not ok
+        assert "Failed to bind UDP port" in blocker.args[0]
+        assert connection._udp_socket is None
+        squatter.close()
+
+    def test_setup_udp_socket_replaces_previous(self, connection):
+        """Calling _setupUdpSocket twice should tear down the first socket."""
+        assert connection._setupUdpSocket(0)
+        first = connection._udp_socket
+        assert connection._setupUdpSocket(0)
+        assert connection._udp_socket is not first
+        connection._teardownUdpSocket()
+
+    def test_teardown_is_idempotent(self, connection):
+        """Tearing down with no active UDP socket should be a no-op."""
+        connection._teardownUdpSocket()
+        connection._teardownUdpSocket()
+        assert connection._udp_socket is None
+
+    def test_stream_frames_stop_tears_down_udp_socket(self, connection):
+        """streamFramesStop (via the private teardown) should release UDP socket.
+
+        We can't call streamFramesStop without a connected TCP socket, but we
+        verify the teardown helper does its job — streamFramesStop delegates.
+        """
+        assert connection._setupUdpSocket(0)
+        connection._teardownUdpSocket()
+        assert connection._udp_socket is None
+
+    def test_udp_datagram_routed_to_packet_received(self, connection, qtbot):
+        """A complete UDP data packet should arrive via packetReceived."""
+        import struct
+
+        from PySide6.QtNetwork import QHostAddress, QUdpSocket
+        from qtm_rt.packet import QRTPacketType, RTheader
+
+        assert connection._setupUdpSocket(0)
+        connection._streaming = True
+        port = connection._udp_socket.localPort()
+
+        # Build a minimal RT data packet: RTheader + QRTPacket payload
+        # (timestamp uint64, framenumber uint32, component_count uint32)
+        payload = struct.pack("<QII", 12345, 42, 0)
+        datagram = RTheader.pack(RTheader.size + len(payload), QRTPacketType.PacketData.value) + payload
+
+        sender = QUdpSocket()
+        with qtbot.waitSignal(connection.packetReceived, timeout=2000) as blocker:
+            sender.writeDatagram(datagram, QHostAddress.LocalHost, port)
+
+        packet = blocker.args[0]
+        assert packet.framenumber == 42
+        assert packet.timestamp == 12345
+        sender.close()
+        connection._teardownUdpSocket()
