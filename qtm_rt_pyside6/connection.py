@@ -6,7 +6,7 @@ from collections import deque
 from collections.abc import Callable
 
 from PySide6.QtCore import QObject, QTimer, Signal, Slot
-from PySide6.QtNetwork import QAbstractSocket, QTcpSocket
+from PySide6.QtNetwork import QAbstractSocket, QHostAddress, QTcpSocket, QUdpSocket
 from qtm_rt.packet import QRTEvent, QRTPacket, QRTPacketType, RTCommand, RTheader
 from qtm_rt.receiver import Receiver
 
@@ -100,6 +100,13 @@ class QTMConnection(QObject):
         self._command_queue: deque[str] = deque()
         self._streaming = False
         self._response_callbacks: dict[str, Callable] = {}
+
+        # UDP receive socket, created lazily when streamFrames is called with
+        # a udp_port. Data packets arriving via UDP are fed into a separate
+        # Receiver that shares the TCP packet handlers, so downstream consumers
+        # see the same signals regardless of transport.
+        self._udp_socket: QUdpSocket | None = None
+        self._udp_receiver: Receiver | None = None
 
         self._connect_timer = QTimer(self)
         self._connect_timer.setSingleShot(True)
@@ -219,15 +226,25 @@ class QTMConnection(QObject):
                 Components may include channel selection suffix, e.g.,
                 'analog:1,3,5-8' or 'analogsingle:2,4'.
             frames: Frame selection - 'allframes', 'frequency:N', or 'frequencydivisor:N'
-            udp_port: Optional UDP port for UDP streaming (1023-65535).
-            udp_address: Optional UDP address. If udp_port is set but address is
-                omitted, frames are sent to the client's source IP.
+            udp_port: Optional UDP port for UDP streaming (1023-65535). When
+                set, a local UDP socket is bound on this port and QTM sends
+                data packets to it instead of over the TCP connection.
+            udp_address: Optional UDP address passed through to QTM. If omitted,
+                QTM sends frames to the TCP client's source IP. Set this to
+                redirect data to a different host — in that case no local UDP
+                socket is bound and packetReceived will not fire locally.
 
-        Packets arrive via packetReceived(QRTPacket) signal (TCP) or on the
-        specified UDP port.
+        Packets arrive via packetReceived(QRTPacket) regardless of whether
+        transport is TCP or UDP.
         """
         if not self._validateComponents(components):
             return
+
+        # Set up local UDP receive socket if requested and no remote redirect.
+        # If the caller redirects with udp_address, we don't bind locally —
+        # the user has chosen to send frames to another host.
+        if udp_port is not None and not udp_address and not self._setupUdpSocket(udp_port):
+            return  # error already emitted
 
         self._streaming = True
         parts = ["streamframes"]
@@ -245,6 +262,7 @@ class QTMConnection(QObject):
         """Stop streaming frames."""
         self._streaming = False
         self._sendCommand("streamframes stop", expect_response=False)
+        self._teardownUdpSocket()
 
     @Slot(str)
     def takeControl(self, password: str) -> None:
@@ -480,6 +498,55 @@ class QTMConnection(QObject):
         if callback:
             callback(data)
 
+    def _setupUdpSocket(self, udp_port: int) -> bool:
+        """Bind a UDP socket on udp_port for receiving streamed frames.
+
+        Returns True on success; emits error() and returns False on failure.
+        """
+        # Tear down any previous UDP session (e.g. if streamFrames is called
+        # twice without a streamFramesStop in between).
+        self._teardownUdpSocket()
+
+        socket = QUdpSocket(self)
+        # Bind to any local interface. QTM sends to the source IP of the TCP
+        # connection by default, which the OS routes to the correct interface.
+        if not socket.bind(QHostAddress.AnyIPv4, udp_port):
+            err = f"Failed to bind UDP port {udp_port}: {socket.errorString()}"
+            LOG.error(err)
+            socket.deleteLater()
+            self.error.emit(err)
+            return False
+
+        socket.readyRead.connect(self._onUdpReadyRead)
+        self._udp_socket = socket
+        self._udp_receiver = Receiver(self._handlers)
+        LOG.info("UDP receive socket bound on port %d", udp_port)
+        return True
+
+    def _teardownUdpSocket(self) -> None:
+        """Close and release the UDP receive socket, if any."""
+        if self._udp_socket is not None:
+            self._udp_socket.close()
+            self._udp_socket.deleteLater()
+            self._udp_socket = None
+            self._udp_receiver = None
+
+    def _onUdpReadyRead(self) -> None:
+        """Read pending UDP datagrams and route them through the packet handlers.
+
+        Each QTM UDP datagram is a complete RT packet, but we still feed them
+        through a Receiver so the parsing path is identical to TCP and any
+        future protocol variations are handled uniformly.
+        """
+        socket = self._udp_socket
+        receiver = self._udp_receiver
+        if socket is None or receiver is None:
+            return
+        while socket.hasPendingDatagrams():
+            datagram, _host, _port = socket.readDatagram(socket.pendingDatagramSize())
+            if datagram:
+                receiver.data_received(bytes(datagram))
+
     # -------------------------------------------------------------------------
     # Socket event handlers
     # -------------------------------------------------------------------------
@@ -498,6 +565,7 @@ class QTMConnection(QObject):
         self._command_queue.clear()
         self._response_callbacks.clear()
         self._receiver = Receiver(self._handlers)
+        self._teardownUdpSocket()
         self.disconnected.emit()
 
     def _onSocketError(self, error: QAbstractSocket.SocketError) -> None:
