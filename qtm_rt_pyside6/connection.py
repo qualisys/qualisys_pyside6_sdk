@@ -253,7 +253,7 @@ class QTMConnection(QObject):
         Args:
             password: Password as configured in QTM.
 
-        Response via responseReceived("takecontrol", bytes).
+        Response via responseReceived("takecontrol", str).
         """
         self._sendCommand(f"takecontrol {password}")
 
@@ -261,7 +261,7 @@ class QTMConnection(QObject):
     def releaseControl(self) -> None:
         """Release control of QTM.
 
-        Response via responseReceived("releasecontrol", bytes).
+        Response via responseReceived("releasecontrol", str).
         """
         self._sendCommand("releasecontrol")
 
@@ -269,7 +269,7 @@ class QTMConnection(QObject):
     def newMeasurement(self) -> None:
         """Create a new measurement. Requires control.
 
-        Response via responseReceived("new", bytes).
+        Response via responseReceived("new", str).
         """
         self._sendCommand("new")
 
@@ -277,7 +277,7 @@ class QTMConnection(QObject):
     def closeMeasurement(self) -> None:
         """Close current measurement.
 
-        Response via responseReceived("close", bytes).
+        Response via responseReceived("close", str).
         """
         self._sendCommand("close")
 
@@ -288,7 +288,7 @@ class QTMConnection(QObject):
         Args:
             rtFromFile: If True, start RT from file instead of live capture.
 
-        Response via responseReceived("start", bytes).
+        Response via responseReceived("start", str).
         """
         cmd = "start" + (" rtfromfile" if rtFromFile else "")
         self._sendCommand(cmd)
@@ -297,7 +297,7 @@ class QTMConnection(QObject):
     def stop(self) -> None:
         """Stop measurement or RT from file.
 
-        Response via responseReceived("stop", bytes).
+        Response via responseReceived("stop", str).
         """
         self._sendCommand("stop")
 
@@ -308,7 +308,7 @@ class QTMConnection(QObject):
         Args:
             filename: Path to measurement file.
 
-        Response via responseReceived("load", bytes).
+        Response via responseReceived("load", str).
         """
         self._sendCommand(f"load {filename}")
 
@@ -320,7 +320,7 @@ class QTMConnection(QObject):
             filename: Filename to save as.
             overwrite: Whether to overwrite existing file.
 
-        Response via responseReceived("save", bytes).
+        Response via responseReceived("save", str).
         """
         cmd = f"save {filename}" + (" overwrite" if overwrite else "")
         self._sendCommand(cmd)
@@ -332,7 +332,7 @@ class QTMConnection(QObject):
         Args:
             projectPath: Path to project.
 
-        Response via responseReceived("loadproject", bytes).
+        Response via responseReceived("loadproject", str).
         """
         self._sendCommand(f"loadproject {projectPath}")
 
@@ -340,7 +340,7 @@ class QTMConnection(QObject):
     def trig(self) -> None:
         """Trigger QTM (for software/wireless trigger mode).
 
-        Response via responseReceived("trig", bytes).
+        Response via responseReceived("trig", str).
         """
         self._sendCommand("trig")
 
@@ -351,7 +351,7 @@ class QTMConnection(QObject):
         Args:
             event: Optional event label.
 
-        Response via responseReceived("event", bytes).
+        Response via responseReceived("event", str).
         """
         cmd = "event" + (f" {event}" if event else "")
         self._sendCommand(cmd)
