@@ -23,6 +23,7 @@ class QTMConnection(QObject):
         packetReceived(QRTPacket): Emitted for each data packet during streaming
         eventReceived(QRTEvent): Emitted for QTM events
         responseReceived(str, object): Emitted for command responses (command_name, data)
+        noMoreData: Emitted when QTM signals end-of-file during RT-from-file streaming
 
     Example:
         connection = QTMConnection()
@@ -39,6 +40,7 @@ class QTMConnection(QObject):
     # Streaming signals
     packetReceived = Signal(object)  # QRTPacket
     eventReceived = Signal(object)  # QRTEvent
+    noMoreData = Signal()  # End-of-file during RT-from-file streaming
 
     # Command response signal (command_name, data)
     responseReceived = Signal(str, object)
@@ -127,7 +129,7 @@ class QTMConnection(QObject):
     # Public API
     # -------------------------------------------------------------------------
 
-    @Slot(str, int)
+    @Slot(str, int, str, int)
     def connectToHost(self, host: str, port: int = 22223, version: str = "1.25", timeout_ms: int = 5000) -> None:
         """Connect to QTM at the specified host and port.
 
@@ -210,7 +212,7 @@ class QTMConnection(QObject):
         cmd = f"getcurrentframe {' '.join(components)}"
         self._sendCommand(cmd)
 
-    @Slot(list, str)
+    @Slot(list, str, int, str)
     def streamFrames(
         self,
         components: list[str],
@@ -230,7 +232,7 @@ class QTMConnection(QObject):
                 Components may include channel selection suffix, e.g.,
                 'analog:1,3,5-8' or 'analogsingle:2,4'.
             frames: Frame selection - 'allframes', 'frequency:N', or 'frequencydivisor:N'
-            udp_port: Optional UDP port for UDP streaming (1023-65535). When
+            udp_port: Optional UDP port for UDP streaming (1024-65535). When
                 set, a local UDP socket is bound on this port and QTM sends
                 data packets to it instead of over the TCP connection.
             udp_address: Optional UDP address passed through to QTM. If omitted,
@@ -249,9 +251,10 @@ class QTMConnection(QObject):
         # Validate the documented UDP port range. Binding to 0 would work at
         # the OS level (ephemeral port), but the command sent to QTM would
         # still be "udp:0", so QTM would have no idea where to send frames
-        # and packetReceived would never fire. Reject that up front.
-        if udp_port is not None and not (1023 <= udp_port <= 65535):
-            self.error.emit(f"udp_port must be between 1023 and 65535, got {udp_port}")
+        # and packetReceived would never fire. Reject that (and the privileged
+        # port range) up front.
+        if udp_port is not None and not (1024 <= udp_port <= 65535):
+            self.error.emit(f"udp_port must be between 1024 and 65535, got {udp_port}")
             return
 
         # Guard: if we're not connected, bail out before any side-effecting
@@ -618,6 +621,7 @@ class QTMConnection(QObject):
     def _onNoMoreData(self, data: bytes) -> None:
         """Handle no more data packet (end of file during RT from file)."""
         LOG.debug("No more data")
+        self.noMoreData.emit()
 
     def _onEvent(self, event: QRTEvent) -> None:
         """Handle event packet."""
