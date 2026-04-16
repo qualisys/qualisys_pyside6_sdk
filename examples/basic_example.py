@@ -59,7 +59,7 @@ class StreamingApp:
         if self._frames_received >= FRAME_LIMIT:
             print(f"\nReached {FRAME_LIMIT} frames, shutting down...")
             self.connection.streamFramesStop()
-            self.connection.quit()
+            self.connection.disconnectFromHost()
 
 
 if __name__ == "__main__":
