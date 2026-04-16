@@ -143,7 +143,6 @@ class TestQTMConnectionCommands:
             lambda: connection.trig(),
             lambda: connection.setQtmEvent("test"),
             lambda: connection.sendXml("<xml/>"),
-            lambda: connection.calibrate(),
             lambda: connection.led(1, "on", "green"),
         ]
         for cmd in commands:

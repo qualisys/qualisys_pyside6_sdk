@@ -368,15 +368,6 @@ class QTMConnection(QObject):
         self._sendCommand(xml, command_type=QRTPacketType.PacketXML, command_name="xml")
 
     @Slot()
-    def calibrate(self) -> None:
-        """Start calibration. Response comes via responseReceived("calibrate", xml).
-
-        Note: Calibration can take several minutes. The response will arrive
-        when calibration completes.
-        """
-        self._sendCommand("calibrate")
-
-    @Slot()
     def quit(self) -> None:
         """Send quit command and disconnect.
 
