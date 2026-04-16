@@ -55,6 +55,30 @@ class TestQTMConnectionValidation:
     def test_validate_components_case_insensitive(self, connection):
         assert connection._validateComponents(["3D", "6D", "ANALOG"])
 
+    def test_validate_skeleton_global_accepted(self, connection):
+        """'skeleton:global' is a distinct component in the QTM protocol."""
+        assert connection._validateComponents(["skeleton:global"])
+        assert connection._validateComponents(["SKELETON:GLOBAL"])
+
+    def test_validate_skeleton_garbage_rejected(self, connection, qtbot):
+        """Skeleton doesn't accept arbitrary colon-suffixes — only :global."""
+        with qtbot.waitSignal(connection.error) as blocker:
+            result = connection._validateComponents(["skeleton:garbage"])
+        assert not result
+        assert "skeleton:garbage" in blocker.args[0]
+
+    def test_validate_channel_selection_on_analog(self, connection):
+        """Only analog / analogsingle support free-form channel selection."""
+        assert connection._validateComponents(["analog:1,3,5-8"])
+        assert connection._validateComponents(["analogsingle:2,4"])
+
+    def test_validate_channel_selection_rejected_on_other_bases(self, connection, qtbot):
+        """Channel-selection syntax on non-analog components is invalid."""
+        with qtbot.waitSignal(connection.error) as blocker:
+            result = connection._validateComponents(["force:foo"])
+        assert not result
+        assert "force:foo" in blocker.args[0]
+
     def test_validate_components_empty_list(self, connection):
         assert connection._validateComponents([])
 
@@ -225,11 +249,30 @@ class TestQTMConnectionResponseHandling:
         assert len(connection._command_queue) == 0
 
     def test_on_command_version_failure(self, connection, qtbot):
-        """Failed version negotiation should emit error signal."""
+        """Failed version negotiation should emit error signal AND tear down the TCP socket.
+
+        Without the disconnect, the caller is left at a half-open TCP connection
+        with no agreed protocol — any command they send would be silently ignored.
+        """
         connection._command_queue.append("version")
+        connection._socket.disconnectFromHost = MagicMock()
         with qtbot.waitSignal(connection.error) as blocker:
             connection._onCommand(b"Version NOT supported")
         assert "Version negotiation failed" in blocker.args[0]
+        connection._socket.disconnectFromHost.assert_called_once()
+
+    def test_duplicate_version_response_does_not_reemit_connected(self, connection, qtbot):
+        """A second 'Version set to ...' response should not fire connected again."""
+        # First handshake: should emit connected.
+        connection._command_queue.append("version")
+        with qtbot.waitSignal(connection.connected):
+            connection._onCommand(b"Version set to 1.25")
+        assert connection._version_negotiated
+
+        # Second handshake (shouldn't happen in practice but shouldn't re-emit).
+        connection._command_queue.append("version")
+        with qtbot.assertNotEmitted(connection.connected, wait=50):
+            connection._onCommand(b"Version set to 1.25")
 
     def test_on_command_emits_response(self, connection, qtbot):
         """Command responses should be dispatched via responseReceived."""
@@ -266,6 +309,15 @@ class TestQTMConnectionResponseHandling:
         connection._onError(b"Error")
         assert len(connection._command_queue) == 1
         assert connection._command_queue[0] == "cmd2"
+
+    def test_on_error_tears_down_udp_socket(self, connection):
+        """Error aborting a stream must release the UDP socket too, otherwise
+        the port stays bound even though streaming has stopped."""
+        assert connection._setupUdpSocket(22224)
+        assert connection._udp_socket is not None
+        connection._onError(b"fail")
+        assert connection._udp_socket is None
+        assert connection._udp_receiver is None
 
     def test_on_event_emits_signal(self, connection, qtbot):
         """Event packets should emit eventReceived."""
@@ -345,10 +397,20 @@ class TestQTMConnectionQuit:
         """Quit when not connected should just disconnect without error."""
         connection.quit()  # Should not raise
 
-    def test_quit_emits_disconnect(self, connection, qtbot):
-        """Quit should trigger disconnected signal via socket disconnect."""
-        with qtbot.waitSignal(connection.disconnected):
-            connection._onSocketDisconnected()  # Simulate what quit triggers
+    def test_quit_when_connected_sends_quit_then_disconnects(self, connection):
+        """quit() should write the 'quit' payload and then close the socket."""
+        connection.isConnected = lambda: True
+        connection._socket.write = MagicMock(return_value=0)
+        connection._socket.disconnectFromHost = MagicMock()
+
+        connection.quit()
+
+        # The 'quit' command should have been written to the socket.
+        connection._socket.write.assert_called_once()
+        written_bytes = connection._socket.write.call_args[0][0]
+        assert b"quit" in written_bytes
+        # And the TCP socket should have been asked to disconnect.
+        connection._socket.disconnectFromHost.assert_called_once()
 
 
 class TestQTMConnectionLed:
@@ -488,6 +550,20 @@ class TestQTMConnectionUdpStreaming:
         connection._teardownUdpSocket()
         assert connection._udp_socket is None
 
+    def test_udp_address_redirect_does_not_bind_local(self, connection):
+        """When udp_address points at a remote host, we must NOT bind a local
+        UDP socket. The command should still forward the redirect to QTM."""
+        connection.isConnected = lambda: True
+        connection._socket.write = MagicMock(return_value=0)
+
+        connection.streamFrames(["3d"], udp_port=22224, udp_address="10.0.0.5")
+
+        assert connection._udp_socket is None
+        assert connection._udp_receiver is None
+        # The command string sent to QTM should contain the redirect.
+        written = connection._socket.write.call_args[0][0]
+        assert b"udp:10.0.0.5:22224" in written
+
     def test_udp_datagram_routed_to_packet_received(self, connection, qtbot):
         """A complete UDP data packet should arrive via packetReceived."""
         import struct
@@ -513,3 +589,41 @@ class TestQTMConnectionUdpStreaming:
         assert packet.timestamp == 12345
         sender.close()
         connection._teardownUdpSocket()
+
+
+class TestQTMConnectionConnectTimeout:
+    """Test the connect-timeout timer started by connectToHost."""
+
+    def test_on_connect_timeout_aborts_and_emits_error(self, connection, qtbot):
+        """When the timer fires and we're not connected, abort the socket and
+        emit 'Connection timed out'."""
+        connection._socket.abort = MagicMock()
+        with qtbot.waitSignal(connection.error) as blocker:
+            connection._onConnectTimeout()
+        assert blocker.args[0] == "Connection timed out"
+        connection._socket.abort.assert_called_once()
+
+    def test_on_connect_timeout_noop_when_already_connected(self, connection, qtbot):
+        """If the socket connected before the timer fired, the timeout handler
+        should do nothing."""
+        connection.isConnected = lambda: True
+        connection._socket.abort = MagicMock()
+        with qtbot.assertNotEmitted(connection.error, wait=50):
+            connection._onConnectTimeout()
+        connection._socket.abort.assert_not_called()
+
+    def test_connect_timer_started_by_connect_to_host(self, connection):
+        """connectToHost should arm the timer when timeout_ms > 0."""
+        # Point at a documentation-only IP (RFC 5737) so we don't actually connect.
+        # The timer state alone is what we assert.
+        connection.connectToHost("192.0.2.1", port=22223, timeout_ms=10_000)
+        assert connection._connect_timer.isActive()
+        # Clean up so the timer doesn't linger into other tests.
+        connection._socket.abort()
+        connection._connect_timer.stop()
+
+    def test_connect_timer_disabled_when_timeout_zero(self, connection):
+        """timeout_ms=0 should skip arming the timer."""
+        connection.connectToHost("192.0.2.1", port=22223, timeout_ms=0)
+        assert not connection._connect_timer.isActive()
+        connection._socket.abort()
