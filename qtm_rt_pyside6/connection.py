@@ -520,7 +520,7 @@ class QTMConnection(QObject):
         socket.readyRead.connect(self._onUdpReadyRead)
         self._udp_socket = socket
         self._udp_receiver = Receiver(self._handlers)
-        LOG.info("UDP receive socket bound on port %d", udp_port)
+        LOG.info("UDP receive socket bound on port %d", socket.localPort())
         return True
 
     def _teardownUdpSocket(self) -> None:
