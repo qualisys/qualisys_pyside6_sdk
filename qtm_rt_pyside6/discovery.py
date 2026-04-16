@@ -142,15 +142,16 @@ class QTMDiscovery(QObject):
         if len(datagram) < RTheader.size + 3:
             return None
 
-        size, packet_type = RTheader.unpack_from(datagram, 0)
+        size, _packet_type = RTheader.unpack_from(datagram, 0)
 
         # Validate packet
         if size > len(datagram) or size < RTheader.size + 3:
             LOG.warning("Invalid discovery packet size: %d (datagram length: %d)", size, len(datagram))
             return None
 
-        if packet_type != QRTPacketType.PacketDiscover.value:
-            return None
+        # Note: QTM replies to discovery with packet_type == PacketCommand (1),
+        # not PacketDiscover (7). The reference qtm_rt.discovery doesn't check
+        # the type either — just parse the payload.
 
         # Extract info string (null-terminated, before the 2-byte port at end)
         info_end = size - 3  # -1 for null terminator, -2 for port

@@ -104,11 +104,14 @@ class TestQTMDiscoveryResponseParsing:
         result = discovery._parseResponse(bad_datagram, "192.168.1.1")
         assert result is None
 
-    def test_parse_wrong_packet_type(self, discovery):
-        """Non-discovery packet type should return None."""
+    def test_parse_accepts_packet_command(self, discovery):
+        """QTM replies with packet_type == PacketCommand (1), not PacketDiscover (7).
+        The parser must accept those replies so discovery actually works."""
         datagram = _build_discovery_packet("QTM", 22223, packet_type=QRTPacketType.PacketCommand.value)
         result = discovery._parseResponse(datagram, "192.168.1.1")
-        assert result is None
+        assert result is not None
+        assert result.info == "QTM"
+        assert result.port == 22223
 
     def test_parse_ipv6_mapped_address_normalized(self, discovery):
         """IPv6-mapped IPv4 addresses should be normalized."""
