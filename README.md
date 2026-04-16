@@ -78,16 +78,16 @@ discovery.start()
 
 ### QTMConnection Methods
 
-- `connectToHost(host, port=22223, timeout_ms=5000)` - Connect to QTM
-- `disconnectFromHost()` - Disconnect
-- `streamFrames(components, frames="allframes")` - Start streaming
-- `streamFramesStop()` - Stop streaming
-- `getParameters(parameters)` - Get XML configuration
-- `getCurrentFrame(components)` - Get single frame
-- `takeControl(password)` / `releaseControl()` - Control QTM
-- `start()` / `stop()` - Start/stop measurement
-- `load(filename)` / `save(filename)` - Load/save measurements
-- `onResponse(command, callback)` - Register response callback
+Core methods to get started:
+
+- `connectToHost(host, port=22223, version="1.25", timeout_ms=5000)` — Connect to QTM
+- `disconnectFromHost()` — Close the connection
+- `streamFrames(components, frames="allframes", udp_port=None, udp_address=None)` — Start streaming; pass `udp_port` to receive frames over UDP instead of TCP
+- `streamFramesStop()` — Stop streaming
+- `getParameters(parameters)` — Request current configuration as XML
+
+See the class docstring or run `help(QTMConnection)` for the full method
+list — control, load/save, trigger, LED, quit, XML settings, etc.
 
 ### Components
 

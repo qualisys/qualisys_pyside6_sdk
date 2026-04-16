@@ -25,6 +25,47 @@ class QTMConnection(QObject):
         responseReceived(str, object): Emitted for command responses (command_name, data)
         noMoreData(): Emitted when QTM signals end-of-file during RT-from-file streaming
 
+    Methods:
+        Connection:
+            connectToHost(host, port=22223, version="1.25", timeout_ms=5000):
+                Open TCP connection and negotiate protocol version.
+            disconnectFromHost(): Close the connection.
+            isConnected() -> bool: Current connection state.
+            quit(): Send the QTM 'quit' command and disconnect.
+
+        Streaming:
+            streamFrames(components, frames="allframes",
+                         udp_port=None, udp_address=None):
+                Start streaming. Pass udp_port for UDP delivery;
+                omit udp_address to let QTM send to the TCP client IP.
+            streamFramesStop(): Stop streaming.
+            getCurrentFrame(components): Request a single frame.
+
+        Configuration:
+            getParameters(parameters=None): Request QTM config as XML.
+            getQtmVersion(): Request the QTM version string.
+            getByteOrder(): Request the protocol byte order.
+            getState(): Request the current QTM state (via eventReceived).
+            sendXml(xml): Send an XML settings document.
+
+        Measurement control:
+            takeControl(password) / releaseControl():
+                Acquire or release RT control of QTM.
+            newMeasurement() / closeMeasurement():
+                Create / close a measurement.
+            start(rtFromFile=False) / stop():
+                Start / stop measurement or RT from file.
+            load(filename) / save(filename, overwrite=False):
+                Load / save a measurement file.
+            loadProject(projectPath): Load a QTM project.
+            trig(): Software / wireless trigger.
+            setQtmEvent(event=None): Insert a QTM event label.
+            led(camera, mode, color): Control a Miqus camera LED.
+
+        Response callbacks (convenience wrappers over responseReceived):
+            onResponse(command, callback): Register a per-command callback.
+            removeResponseCallback(command): Unregister a callback.
+
     Example:
         connection = QTMConnection()
         connection.connected.connect(on_connected)
