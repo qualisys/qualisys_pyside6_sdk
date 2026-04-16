@@ -64,7 +64,7 @@ discovery.start()
 ### QTMConnection Methods
 
 - `connectToHost(host, port=22223, timeout_ms=5000)` - Connect to QTM
-- `disconnect()` - Disconnect
+- `disconnectFromHost()` - Disconnect
 - `streamFrames(components, frames="allframes")` - Start streaming
 - `streamFramesStop()` - Stop streaming
 - `getParameters(parameters)` - Get XML configuration
