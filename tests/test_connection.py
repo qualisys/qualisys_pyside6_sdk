@@ -114,10 +114,22 @@ class TestQTMConnectionCommands:
         bound UDP socket or _streaming=True behind."""
         assert not connection.isConnected()
         with qtbot.waitSignal(connection.error) as blocker:
-            connection.streamFrames(["3d"], udp_port=0)
+            connection.streamFrames(["3d"], udp_port=22224)
         assert blocker.args[0] == "Not connected"
         assert connection._udp_socket is None
         assert connection._udp_receiver is None
+        assert not connection._streaming
+
+    @pytest.mark.parametrize("bad_port", [-1, 0, 1022, 65536, 100000])
+    def test_stream_frames_rejects_out_of_range_udp_port(self, connection, qtbot, bad_port):
+        """udp_port must be inside the documented range. The OS would accept 0
+        (ephemeral bind) but QTM would receive 'udp:0' and never send frames,
+        so the caller gets a silent failure — reject up front."""
+        with qtbot.waitSignal(connection.error) as blocker:
+            connection.streamFrames(["3d"], udp_port=bad_port)
+        assert "udp_port must be between" in blocker.args[0]
+        # Validation happens before any state mutation.
+        assert connection._udp_socket is None
         assert not connection._streaming
 
     def test_get_parameters_invalid_emits_error(self, connection, qtbot):

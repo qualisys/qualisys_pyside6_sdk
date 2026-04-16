@@ -242,6 +242,14 @@ class QTMConnection(QObject):
         if not self._validateComponents(components):
             return
 
+        # Validate the documented UDP port range. Binding to 0 would work at
+        # the OS level (ephemeral port), but the command sent to QTM would
+        # still be "udp:0", so QTM would have no idea where to send frames
+        # and packetReceived would never fire. Reject that up front.
+        if udp_port is not None and not (1023 <= udp_port <= 65535):
+            self.error.emit(f"udp_port must be between 1023 and 65535, got {udp_port}")
+            return
+
         # Guard: if we're not connected, bail out before any side-effecting
         # setup. Otherwise _sendCommand would emit "Not connected" but leave
         # a bound UDP socket and _streaming=True behind.
