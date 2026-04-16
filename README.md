@@ -114,7 +114,7 @@ The [examples/](examples/) directory contains ready-to-run scripts (requires QTM
 To work on the SDK itself:
 
 ```bash
-git clone --recursive https://github.com/qualisys/qualisys_pyside6_sdk.git
+git clone https://github.com/qualisys/qualisys_pyside6_sdk.git
 cd qualisys_pyside6_sdk
 
 # Create and activate a virtual environment
@@ -126,14 +126,9 @@ python -m venv .venv
 # macOS / Linux
 source .venv/bin/activate
 
-# Install dependencies
+# Install dev dependencies (pytest, pytest-qt, ruff, build) and the package
 pip install -r requirements-dev.txt
 pip install -e .
-```
-
-If you cloned without `--recursive`:
-```bash
-git submodule update --init
 ```
 
 Run tests and linting:

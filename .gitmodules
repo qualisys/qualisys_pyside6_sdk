@@ -1,3 +1,0 @@
-[submodule "qtm_rt"]
-	path = qtm_rt
-	url = https://github.com/qualisys/qualisys_python_sdk.git
