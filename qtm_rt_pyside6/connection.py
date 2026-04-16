@@ -101,6 +101,13 @@ class QTMConnection(QObject):
         self._streaming = False
         self._response_callbacks: dict[str, Callable] = {}
 
+        # Calibration is a two-phase command: QTM acknowledges with a command
+        # packet ("Starting calibration") and then sends the result XML when
+        # calibration completes (minutes later). We bypass the regular
+        # command queue and route the result via this flag instead — see
+        # _onCommand and _onXml.
+        self._calibration_pending = False
+
         self._connect_timer = QTimer(self)
         self._connect_timer.setSingleShot(True)
         self._connect_timer.timeout.connect(self._onConnectTimeout)
@@ -369,12 +376,23 @@ class QTMConnection(QObject):
 
     @Slot()
     def calibrate(self) -> None:
-        """Start calibration. Response comes via responseReceived("calibrate", xml).
+        """Start calibration. Result XML arrives via responseReceived("calibrate", str).
 
-        Note: Calibration can take several minutes. The response will arrive
-        when calibration completes.
+        Calibration is a two-phase command: QTM first acknowledges with
+        "Starting calibration" (silently logged, not emitted) and then,
+        minutes later, sends the result as an XML payload. Only the XML
+        result is delivered to your handler.
+
+        If calibration fails server-side, the error is delivered via the
+        normal error(str) signal.
         """
-        self._sendCommand("calibrate")
+        if not self.isConnected():
+            self.error.emit("Not connected")
+            return
+        # Don't enqueue: calibrate doesn't fit the single-response queue model.
+        # The two-phase response is routed via _calibration_pending instead.
+        self._calibration_pending = True
+        self._sendCommand("calibrate", expect_response=False)
 
     @Slot()
     def quit(self) -> None:
@@ -495,6 +513,7 @@ class QTMConnection(QObject):
         self._connect_timer.stop()
         LOG.info("Disconnected")
         self._streaming = False
+        self._calibration_pending = False
         self._command_queue.clear()
         self._response_callbacks.clear()
         self._receiver = Receiver(self._handlers)
@@ -549,8 +568,11 @@ class QTMConnection(QObject):
         error_msg = response.decode("utf-8", errors="replace")
         LOG.error("QTM error: %s", error_msg)
         self._streaming = False
-        # Discard the command that caused the error
-        if self._command_queue:
+        # Calibration isn't queued, so just clear the flag if it was active.
+        # Otherwise discard the command that caused the error from the queue.
+        if self._calibration_pending:
+            self._calibration_pending = False
+        elif self._command_queue:
             self._command_queue.popleft()
         self.error.emit(error_msg)
 
@@ -558,6 +580,13 @@ class QTMConnection(QObject):
         """Handle XML response."""
         xml_str = response.decode("utf-8", errors="replace")
         LOG.debug("XML response: %s...", xml_str[:70])
+
+        # Calibration result arrives as XML and is routed via the dedicated
+        # flag, not the command queue.
+        if self._calibration_pending:
+            self._calibration_pending = False
+            self._emitResponse("calibrate", xml_str)
+            return
 
         if self._command_queue:
             cmd = self._command_queue.popleft()
@@ -570,6 +599,13 @@ class QTMConnection(QObject):
 
         # Skip initial connection message
         if response_str == "QTM RT Interface connected":
+            return
+
+        # Calibration acknowledgement: log and wait for the XML result.
+        # The "calibrate" command isn't in the queue, so this never pops
+        # someone else's slot.
+        if self._calibration_pending and response_str.lower().startswith("starting calibration"):
+            LOG.info("Calibration started, awaiting result XML")
             return
 
         # Handle version negotiation

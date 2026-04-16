@@ -1,5 +1,6 @@
 """Tests for QTMConnection"""
 
+from collections import deque
 from unittest.mock import MagicMock
 
 import pytest
@@ -401,3 +402,93 @@ class TestQTMConnectionDisconnect:
     def test_disconnect_emits_signal(self, connection, qtbot):
         with qtbot.waitSignal(connection.disconnected):
             connection._onSocketDisconnected()
+
+    def test_disconnect_clears_calibration_pending(self, connection):
+        """A pending calibration should be reset on disconnect."""
+        connection._calibration_pending = True
+        connection._onSocketDisconnected()
+        assert not connection._calibration_pending
+
+
+class TestQTMConnectionCalibration:
+    """Test the two-phase calibration command flow.
+
+    QTM responds to "calibrate" with:
+      1. A command packet "Starting calibration" (acknowledgement)
+      2. Minutes later, an XML packet with the calibration result
+
+    The wrapper must deliver only the XML result via responseReceived.
+    """
+
+    def test_calibration_pending_false_initially(self, connection):
+        assert not connection._calibration_pending
+
+    def test_calibrate_does_not_use_command_queue(self, connection):
+        """Calibrate bypasses the queue so its two-phase flow doesn't pop other slots."""
+        # Pretend we're connected so calibrate() actually sends.
+        connection.isConnected = lambda: True
+        connection._socket.write = MagicMock(return_value=0)
+        connection.calibrate()
+        assert connection._calibration_pending
+        assert len(connection._command_queue) == 0
+
+    def test_calibrate_starting_message_swallowed(self, connection, qtbot):
+        """The 'Starting calibration' ack should be logged, not emitted."""
+        connection._calibration_pending = True
+        # Pre-existing command in the queue should not be popped by the ack.
+        connection._command_queue.append("qtmversion")
+
+        # Listen on responseReceived; it should NOT fire for the ack.
+        # Use assertNotEmitted via a brief wait.
+        with qtbot.assertNotEmitted(connection.responseReceived, wait=50):
+            connection._onCommand(b"Starting calibration")
+
+        assert connection._calibration_pending  # still waiting for XML
+        assert connection._command_queue == deque(["qtmversion"])  # untouched
+
+    def test_calibration_xml_emitted_as_calibrate_response(self, connection, qtbot):
+        """The XML result should arrive on responseReceived as ('calibrate', xml)."""
+        connection._calibration_pending = True
+        xml = b"<calibration><residual>0.5</residual></calibration>"
+
+        with qtbot.waitSignal(connection.responseReceived) as blocker:
+            connection._onXml(xml)
+
+        assert blocker.args[0] == "calibrate"
+        assert "<calibration>" in blocker.args[1]
+        assert not connection._calibration_pending
+
+    def test_calibration_xml_does_not_pop_unrelated_queue(self, connection, qtbot):
+        """An XML for a pending calibration must not consume an unrelated queued command."""
+        connection._calibration_pending = True
+        connection._command_queue.append("getparameters")
+
+        with qtbot.waitSignal(connection.responseReceived) as blocker:
+            connection._onXml(b"<calibration/>")
+
+        assert blocker.args[0] == "calibrate"
+        # getparameters slot is still waiting for its own XML response.
+        assert connection._command_queue == deque(["getparameters"])
+
+    def test_normal_xml_still_pops_queue_when_no_pending_calibration(self, connection, qtbot):
+        """Sanity check: existing getparameters/etc XML routing is unaffected."""
+        assert not connection._calibration_pending
+        connection._command_queue.append("getparameters")
+
+        with qtbot.waitSignal(connection.responseReceived) as blocker:
+            connection._onXml(b"<Parameters/>")
+
+        assert blocker.args[0] == "getparameters"
+        assert len(connection._command_queue) == 0
+
+    def test_error_during_calibration_clears_flag_without_popping_queue(self, connection, qtbot):
+        """If QTM errors during calibration, clear the flag — don't pop someone else's slot."""
+        connection._calibration_pending = True
+        connection._command_queue.append("qtmversion")
+
+        with qtbot.waitSignal(connection.error):
+            connection._onError(b"Calibration aborted")
+
+        assert not connection._calibration_pending
+        # qtmversion is still waiting — error was attributed to calibrate, not it.
+        assert connection._command_queue == deque(["qtmversion"])
