@@ -67,6 +67,11 @@ class QTMConnection(QObject):
         "skeleton:global",
     }
 
+    # Components that accept a free-form channel-selection suffix after a
+    # colon, e.g. 'analog:1,3,5-8'. Components not in this set but with a
+    # colon must appear verbatim in VALID_COMPONENTS (e.g. 'skeleton:global').
+    CHANNEL_SELECTABLE = {"analog", "analogsingle"}
+
     # Valid LED modes and colors
     VALID_LED_MODES = {"on", "off", "pulsing"}
     VALID_LED_COLORS = {"green", "amber", "all"}
@@ -97,6 +102,7 @@ class QTMConnection(QObject):
         self._socket.errorOccurred.connect(self._onSocketError)
 
         self._version = "1.25"
+        self._version_negotiated = False
         self._command_queue: deque[str] = deque()
         self._streaming = False
         self._response_callbacks: dict[str, Callable] = {}
@@ -462,14 +468,24 @@ class QTMConnection(QObject):
     def _validateComponents(self, components: list[str]) -> bool:
         """Validate component list.
 
-        Components may include a channel selection suffix separated by a colon,
-        e.g., 'analog:1,3,5-8'. The base component before the colon is validated.
+        Two valid shapes:
+
+        1. A component that appears verbatim in VALID_COMPONENTS, e.g.
+           'skeleton' or 'skeleton:global'. Case-insensitive.
+        2. A CHANNEL_SELECTABLE base followed by a free-form channel
+           selector, e.g. 'analog:1,3,5-8'. Only 'analog' and
+           'analogsingle' support this suffix syntax.
+
+        Anything else (e.g. 'skeleton:garbage' or 'force:foo') is rejected.
         """
         for comp in components:
-            base = comp.split(":")[0].lower()
-            if base not in self.VALID_COMPONENTS:
-                self.error.emit(f"Invalid component: {comp}")
-                return False
+            lc = comp.lower()
+            if lc in self.VALID_COMPONENTS:
+                continue
+            if ":" in lc and lc.split(":", 1)[0] in self.CHANNEL_SELECTABLE:
+                continue
+            self.error.emit(f"Invalid component: {comp}")
+            return False
         return True
 
     def _sendCommand(
@@ -574,6 +590,7 @@ class QTMConnection(QObject):
         self._connect_timer.stop()
         LOG.info("Disconnected")
         self._streaming = False
+        self._version_negotiated = False
         self._command_queue.clear()
         self._response_callbacks.clear()
         self._receiver = Receiver(self._handlers)
@@ -632,6 +649,10 @@ class QTMConnection(QObject):
         # Discard the command that caused the error
         if self._command_queue:
             self._command_queue.popleft()
+        # Release any bound UDP socket — symmetric with streamFramesStop
+        # and _onSocketDisconnected. Without this, an error aborting a UDP
+        # stream would leave the port held.
+        self._teardownUdpSocket()
         self.error.emit(error_msg)
 
     def _onXml(self, response: bytes) -> None:
@@ -656,10 +677,22 @@ class QTMConnection(QObject):
         if self._command_queue and self._command_queue[0] == "version":
             self._command_queue.popleft()
             if response_str.startswith("Version set to"):
-                LOG.info("Connected with protocol %s", self._version)
-                self.connected.emit()
+                # Guard against a duplicate version handshake accidentally
+                # re-emitting connected (e.g. if someone sends "version"
+                # again after the initial successful handshake).
+                if self._version_negotiated:
+                    LOG.debug("Version response received again; ignoring")
+                else:
+                    self._version_negotiated = True
+                    LOG.info("Connected with protocol %s", self._version)
+                    self.connected.emit()
             else:
+                LOG.error("Version negotiation failed: %s", response_str)
                 self.error.emit(f"Version negotiation failed: {response_str}")
+                # The protocol handshake failed — close the TCP socket so the
+                # caller doesn't sit at a half-open connection. _onSocketDisconnected
+                # will clean up the rest of the state.
+                self._socket.disconnectFromHost()
             return
 
         if self._command_queue:
