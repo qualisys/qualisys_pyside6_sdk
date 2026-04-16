@@ -74,7 +74,7 @@ class ParametersApp:
             print(f"XML parse error: {e}")
 
         print()
-        self.connection.disconnect()
+        self.connection.disconnectFromHost()
 
     def on_disconnected(self):
         print("Disconnected")

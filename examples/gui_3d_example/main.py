@@ -441,7 +441,7 @@ class Backend(QObject):
     def disconnect(self):
         if self._streaming:
             self.stopStream()
-        self._connection.disconnect()
+        self._connection.disconnectFromHost()
 
     @Slot()
     def startStream(self):

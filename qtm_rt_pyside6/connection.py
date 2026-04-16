@@ -137,8 +137,12 @@ class QTMConnection(QObject):
         self._socket.connectToHost(host, port)
 
     @Slot()
-    def disconnect(self) -> None:
-        """Disconnect from QTM."""
+    def disconnectFromHost(self) -> None:
+        """Disconnect from QTM.
+
+        Named to mirror connectToHost() and to avoid colliding with
+        QObject.disconnect() (which detaches signal/slot connections).
+        """
         LOG.info("Disconnecting")
         self._socket.disconnectFromHost()
 
