@@ -109,6 +109,17 @@ class TestQTMConnectionCommands:
         with qtbot.waitSignal(connection.error):
             connection.streamFrames(["3d"])
 
+    def test_stream_frames_udp_not_connected_does_not_leak_state(self, connection, qtbot):
+        """streamFrames(..., udp_port=...) while not connected must not leave a
+        bound UDP socket or _streaming=True behind."""
+        assert not connection.isConnected()
+        with qtbot.waitSignal(connection.error) as blocker:
+            connection.streamFrames(["3d"], udp_port=0)
+        assert blocker.args[0] == "Not connected"
+        assert connection._udp_socket is None
+        assert connection._udp_receiver is None
+        assert not connection._streaming
+
     def test_get_parameters_invalid_emits_error(self, connection, qtbot):
         with qtbot.waitSignal(connection.error):
             connection.getParameters(["invalid_param"])

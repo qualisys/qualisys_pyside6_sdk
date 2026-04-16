@@ -234,10 +234,19 @@ class QTMConnection(QObject):
                 redirect data to a different host — in that case no local UDP
                 socket is bound and packetReceived will not fire locally.
 
-        Packets arrive via packetReceived(QRTPacket) regardless of whether
-        transport is TCP or UDP.
+        Packets arrive via packetReceived(QRTPacket) for TCP streaming and
+        for the default UDP case (no udp_address). If udp_address is set to
+        a remote host, frames are sent there and packetReceived will not
+        fire on this connection.
         """
         if not self._validateComponents(components):
+            return
+
+        # Guard: if we're not connected, bail out before any side-effecting
+        # setup. Otherwise _sendCommand would emit "Not connected" but leave
+        # a bound UDP socket and _streaming=True behind.
+        if not self.isConnected():
+            self.error.emit("Not connected")
             return
 
         # Set up local UDP receive socket if requested and no remote redirect.
