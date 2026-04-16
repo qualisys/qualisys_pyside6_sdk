@@ -35,6 +35,7 @@ class TestQTMConnectionInit:
         assert hasattr(connection, "packetReceived")
         assert hasattr(connection, "eventReceived")
         assert hasattr(connection, "responseReceived")
+        assert hasattr(connection, "noMoreData")
 
     def test_command_queue_empty_initially(self, connection):
         assert len(connection._command_queue) == 0
@@ -144,11 +145,12 @@ class TestQTMConnectionCommands:
         assert connection._udp_receiver is None
         assert not connection._streaming
 
-    @pytest.mark.parametrize("bad_port", [-1, 0, 1022, 65536, 100000])
+    @pytest.mark.parametrize("bad_port", [-1, 0, 1023, 65536, 100000])
     def test_stream_frames_rejects_out_of_range_udp_port(self, connection, qtbot, bad_port):
-        """udp_port must be inside the documented range. The OS would accept 0
+        """udp_port must be inside 1024-65535. The OS would accept 0
         (ephemeral bind) but QTM would receive 'udp:0' and never send frames,
-        so the caller gets a silent failure — reject up front."""
+        so the caller gets a silent failure. Ports <= 1023 are privileged on
+        Unix and shouldn't be used for an application listener anyway."""
         with qtbot.waitSignal(connection.error) as blocker:
             connection.streamFrames(["3d"], udp_port=bad_port)
         assert "udp_port must be between" in blocker.args[0]
@@ -325,6 +327,11 @@ class TestQTMConnectionResponseHandling:
         with qtbot.waitSignal(connection.eventReceived) as blocker:
             connection._onEvent(event)
         assert blocker.args[0] == event
+
+    def test_on_no_more_data_emits_signal(self, connection, qtbot):
+        """End-of-file during RT-from-file should surface as noMoreData()."""
+        with qtbot.waitSignal(connection.noMoreData):
+            connection._onNoMoreData(b"")
 
     def test_on_data_streaming_emits_packet(self, connection, qtbot):
         """Data packets during streaming should emit packetReceived."""
