@@ -23,7 +23,7 @@ class QTMConnection(QObject):
         packetReceived(QRTPacket): Emitted for each data packet during streaming
         eventReceived(QRTEvent): Emitted for QTM events
         responseReceived(str, object): Emitted for command responses (command_name, data)
-        noMoreData: Emitted when QTM signals end-of-file during RT-from-file streaming
+        noMoreData(): Emitted when QTM signals end-of-file during RT-from-file streaming
 
     Example:
         connection = QTMConnection()
