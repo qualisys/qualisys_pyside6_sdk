@@ -1,7 +1,10 @@
 """
 Basic example - Stream 3D markers from QTM
 
-Start QTM first, load a file, and enable Play -> Play with Real-Time output
+Start QTM first, load a file, and enable Play -> Play with Real-Time output.
+
+The example stops automatically after FRAME_LIMIT frames so it exits
+cleanly instead of running until Ctrl+C.
 """
 
 import sys
@@ -10,10 +13,13 @@ from PySide6.QtCore import QCoreApplication
 
 from qtm_rt_pyside6 import QRTPacket, QTMConnection
 
+FRAME_LIMIT = 100
+
 
 class StreamingApp:
     def __init__(self):
         self.connection = QTMConnection()
+        self._frames_received = 0
 
         # Connect signals
         self.connection.connected.connect(self.on_connected)
@@ -26,7 +32,7 @@ class StreamingApp:
         self.connection.connectToHost(host)
 
     def on_connected(self):
-        print("Connected! Starting 3D stream...")
+        print(f"Connected! Streaming 3D for {FRAME_LIMIT} frames...")
         self.connection.streamFrames(components=["3d"])
 
     def on_disconnected(self):
@@ -38,6 +44,7 @@ class StreamingApp:
         QCoreApplication.quit()
 
     def on_packet(self, packet: QRTPacket):
+        self._frames_received += 1
         print(f"Frame {packet.framenumber}")
 
         result = packet.get_3d_markers()
@@ -48,6 +55,11 @@ class StreamingApp:
                 print(f"    [{i}] x={marker.x:.1f} y={marker.y:.1f} z={marker.z:.1f}")
             if header.marker_count > 5:
                 print(f"    ... and {header.marker_count - 5} more")
+
+        if self._frames_received >= FRAME_LIMIT:
+            print(f"\nReached {FRAME_LIMIT} frames, shutting down...")
+            self.connection.streamFramesStop()
+            self.connection.quit()
 
 
 if __name__ == "__main__":
