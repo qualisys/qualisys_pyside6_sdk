@@ -51,18 +51,6 @@ connection.connectToHost("127.0.0.1")
 sys.exit(app.exec())
 ```
 
-## Discovery
-
-Find QTM instances on the network:
-
-```python
-from qtm_rt_pyside6 import QTMDiscovery
-
-discovery = QTMDiscovery()
-discovery.discovered.connect(lambda r: print(f"Found: {r.host}:{r.port}"))
-discovery.start()
-```
-
 ## API
 
 ### QTMConnection Signals
