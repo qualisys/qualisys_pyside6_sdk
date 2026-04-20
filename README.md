@@ -83,13 +83,11 @@ Valid streaming components: `2d`, `2dlin`, `3d`, `3dres`, `3dnolabels`, `3dnolab
 
 ## Examples
 
-The [examples/](examples/) directory contains ready-to-run scripts (requires QTM running):
-
-- **basic_example.py** - Stream 3D markers to console
-- **discovery_example.py** - Find QTM on the network
-- **parameters_example.py** - Get QTM configuration as XML
-- **gui_example.py** - Qt Widgets GUI with data table
-- **gui_3d_example/** - Qt Quick 3D visualization with orbit camera
+Ready-to-run scripts live in [examples/](examples/) — see
+[examples/README.md](examples/README.md) for what each one demonstrates
+and how to run it. `basic_example.py` is the shortest path to verify
+your setup; the GUI examples (`gui_example.py` and `gui_3d_example/`)
+show how to wire the SDK into a desktop application.
 
 ## Known Limitations
 
