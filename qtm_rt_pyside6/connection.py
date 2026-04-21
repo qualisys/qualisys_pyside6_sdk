@@ -318,13 +318,18 @@ class QTMConnection(QObject):
             return  # error already emitted
 
         self._streaming = True
-        parts = ["streamframes"]
+        # Per the QTM RT protocol the frame-selector token (AllFrames /
+        # Frequency:N / FrequencyDivisor:N) must come immediately after
+        # "streamframes", *before* the optional UDP redirect. Building the
+        # command the other way around makes QTM reply with "Parse Error".
+        # Protocol reference:
+        # https://docs.qualisys.com/qtm-rt-protocol/#streamframes
+        parts = ["streamframes", frames]
         if udp_port is not None:
             if udp_address:
                 parts.append(f"udp:{udp_address}:{udp_port}")
             else:
                 parts.append(f"udp:{udp_port}")
-        parts.append(frames)
         parts.extend(components)
         self._sendCommand(" ".join(parts))
 

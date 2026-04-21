@@ -571,6 +571,49 @@ class TestQTMConnectionUdpStreaming:
         written = connection._socket.write.call_args[0][0]
         assert b"udp:10.0.0.5:22224" in written
 
+    def test_stream_frames_tcp_command_order(self, connection):
+        """QTM requires: streamframes <frames> <components...>"""
+        connection.isConnected = lambda: True
+        connection._socket.write = MagicMock(return_value=0)
+
+        connection.streamFrames(["3d"])
+
+        written = bytes(connection._socket.write.call_args[0][0])
+        # The payload is an RT header + command bytes + NUL; assert the command
+        # substring is intact and in the documented order.
+        assert b"streamframes allframes 3d" in written
+
+    def test_stream_frames_udp_command_order(self, connection):
+        """QTM requires the frame selector *before* the UDP token:
+
+            streamframes <frames> udp[:address]:port <components...>
+
+        Swapping that order makes QTM reply with 'Parse Error'.
+        Reference: https://docs.qualisys.com/qtm-rt-protocol/#streamframes
+        """
+        connection.isConnected = lambda: True
+        connection._socket.write = MagicMock(return_value=0)
+
+        connection.streamFrames(["2d"], udp_port=33333, udp_address="192.168.254.255")
+
+        written = bytes(connection._socket.write.call_args[0][0])
+        assert b"streamframes allframes udp:192.168.254.255:33333 2d" in written
+
+    def test_stream_frames_udp_no_address_command_order(self, connection):
+        """Same as above but without explicit udp_address — QTM sends back to
+        the TCP client's source IP."""
+        connection.isConnected = lambda: True
+        connection._socket.write = MagicMock(return_value=0)
+        # Skip the actual local UDP bind so the test doesn't collide with any
+        # previously-bound ephemeral port — we only care about the outgoing
+        # command string here.
+        connection._setupUdpSocket = MagicMock(return_value=True)
+
+        connection.streamFrames(["3d"], udp_port=22224)
+
+        written = bytes(connection._socket.write.call_args[0][0])
+        assert b"streamframes allframes udp:22224 3d" in written
+
     def test_udp_datagram_routed_to_packet_received(self, connection, qtbot):
         """A complete UDP data packet should arrive via packetReceived."""
         import struct
