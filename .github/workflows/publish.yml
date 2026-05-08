@@ -29,14 +29,14 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     environment: pypi
+    permissions: 
+      id-token: write
     steps:
       - uses: actions/download-artifact@v8
         with:
           name: dist
           path: dist/
       - uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          repository-url: https://test.pypi.org/legacy/
 
   upload-release-assets:
     needs: build
