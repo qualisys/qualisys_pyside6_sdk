@@ -1,5 +1,7 @@
 # Qualisys PySide6 SDK
 
+[![PyPI](https://img.shields.io/pypi/v/qtm-rt-pyside6)](https://pypi.org/project/qtm-rt-pyside6/)
+
 PySide6-based SDK for the Qualisys Real-Time (RT) protocol. Stream motion capture data from QTM using Qt's native networking and signals/slots.
 
 ## Installation
