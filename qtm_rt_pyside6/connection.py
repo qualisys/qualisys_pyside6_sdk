@@ -331,6 +331,10 @@ class QTMConnection(QObject):
             else:
                 parts.append(f"udp:{udp_port}")
         parts.extend(components)
+        # QTM never replies to a successful streamframes, but it sends an error
+        # packet if it rejects one. Queue it anyway so that error is matched to
+        # it rather than to the next command. The packet handlers drop the
+        # entry once QTM shows it accepted the command.
         self._sendCommand(" ".join(parts))
 
     @Slot()
@@ -567,6 +571,16 @@ class QTMConnection(QObject):
         LOG.debug("Sending: %s", command)
         self._socket.write(packet)
 
+    def _dropAcceptedStreamFrames(self) -> None:
+        """Remove streamframes entries from the head of the command queue.
+
+        Called when QTM answers a later command. QTM handles commands in order
+        and only answers a streamframes if it rejects it, so a streamframes
+        still ahead of the answer was accepted.
+        """
+        while self._command_queue and self._command_queue[0] == "streamframes":
+            self._command_queue.popleft()
+
     def _emitResponse(self, command: str, data: object) -> None:
         """Emit response via signal and/or callback."""
         self.responseReceived.emit(command, data)
@@ -671,8 +685,14 @@ class QTMConnection(QObject):
 
     def _onData(self, packet: QRTPacket) -> None:
         """Handle data packet."""
+        if self._command_queue and self._command_queue[0] == "streamframes":
+            # The first frame of a stream is QTM's only sign that it accepted
+            # streamframes. The frame itself is stream data, not a reply.
+            self._command_queue.popleft()
+            if self._streaming:
+                self.packetReceived.emit(packet)
         # Check if this is a response to getCurrentFrame
-        if self._command_queue and self._command_queue[0] == "getcurrentframe":
+        elif self._command_queue and self._command_queue[0] == "getcurrentframe":
             cmd = self._command_queue.popleft()
             self._emitResponse(cmd, packet)
         elif self._streaming:
@@ -682,8 +702,12 @@ class QTMConnection(QObject):
             self._emitResponse(cmd, packet)
 
     def _onNoMoreData(self, data: bytes) -> None:
-        """Handle no more data packet (end of file during RT from file)."""
+        """Handle no more data packet (no measurement running, or end of file during RT from file)."""
         LOG.debug("No more data")
+        # With no measurement to stream, QTM accepts streamframes by sending
+        # NoMoreData straight away.
+        if self._command_queue and self._command_queue[0] == "streamframes":
+            self._command_queue.popleft()
         self.noMoreData.emit()
 
     def _onEvent(self, event: QRTEvent) -> None:
@@ -696,7 +720,9 @@ class QTMConnection(QObject):
         error_msg = response.decode("utf-8", errors="replace")
         LOG.error("QTM error: %s", error_msg)
         self._streaming = False
-        # Discard the command that caused the error
+        # Discard the command that caused the error. QTM handles commands in
+        # order, so that is the head of the queue, a rejected streamframes
+        # included (it stays queued until QTM accepts it).
         if self._command_queue:
             self._command_queue.popleft()
         # Release any bound UDP socket — symmetric with streamFramesStop
@@ -710,6 +736,7 @@ class QTMConnection(QObject):
         xml_str = response.decode("utf-8", errors="replace")
         LOG.debug("XML response: %s...", xml_str[:70])
 
+        self._dropAcceptedStreamFrames()
         if self._command_queue:
             cmd = self._command_queue.popleft()
             self._emitResponse(cmd, xml_str)
@@ -722,6 +749,8 @@ class QTMConnection(QObject):
         # Skip initial connection message
         if response_str == "QTM RT Interface connected":
             return
+
+        self._dropAcceptedStreamFrames()
 
         # Handle version negotiation
         if self._command_queue and self._command_queue[0] == "version":

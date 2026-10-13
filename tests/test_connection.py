@@ -1,11 +1,13 @@
 """Tests for QTMConnection"""
 
+import struct
 from unittest.mock import MagicMock
 
 import pytest
 from PySide6.QtNetwork import QTcpSocket
+from qtm_rt.packet import RTheader
 
-from qtm_rt_pyside6 import QRTEvent, QRTPacket, QTMConnection
+from qtm_rt_pyside6 import QRTEvent, QRTPacket, QRTPacketType, QTMConnection
 
 
 @pytest.fixture
@@ -395,6 +397,114 @@ class TestQTMConnectionCommandQueue:
         # Should not raise
         connection._onCommand(b"Unexpected response")
         connection._onXml(b"<Unexpected/>")
+
+
+class TestQTMConnectionStreamFramesQueue:
+    """QTM never replies to a successful streamframes. It starts sending data
+    packets (or a NoMoreData packet when no measurement is running), and sends
+    an error packet only if it rejects the command. Replies to later commands
+    must not be handed to streamframes, and a streamframes error must not
+    discard a later command. Packets are fed through the real Receiver.
+
+    Reference: https://docs.qualisys.com/qtm-rt-protocol/#streamframes
+    """
+
+    @pytest.fixture
+    def live(self, connection):
+        """A connection with a mocked, connected socket and the version handshake done."""
+        connection.isConnected = lambda: True
+        connection._socket.write = MagicMock(return_value=0)
+        connection._onSocketConnected()
+        self._feed(connection, QRTPacketType.PacketCommand, b"QTM RT Interface connected")
+        self._feed(connection, QRTPacketType.PacketCommand, b"Version set to 1.25")
+        assert connection._version_negotiated
+        assert len(connection._command_queue) == 0
+        return connection
+
+    @staticmethod
+    def _feed(connection, packet_type, payload=b""):
+        """Deliver one RT packet from QTM, as _onReadyRead would."""
+        if packet_type in (QRTPacketType.PacketError, QRTPacketType.PacketCommand, QRTPacketType.PacketXML):
+            payload += b"\0"
+        connection._receiver.data_received(RTheader.pack(RTheader.size + len(payload), packet_type.value) + payload)
+
+    @classmethod
+    def _feed_frame(cls, connection, framenumber=1):
+        # Data payload: timestamp uint64, framenumber uint32, component_count uint32
+        cls._feed(connection, QRTPacketType.PacketData, struct.pack("<QII", 1000, framenumber, 0))
+
+    @pytest.mark.parametrize(
+        "after_stream_start",
+        [
+            pytest.param([], id="reply-before-first-frame"),
+            pytest.param([QRTPacketType.PacketData, QRTPacketType.PacketData], id="frames-first"),
+            pytest.param([QRTPacketType.PacketNoMoreData], id="no-measurement"),
+        ],
+    )
+    def test_get_parameters_while_streaming(self, live, qtbot, after_stream_start):
+        """connect -> getParameters -> streamFrames -> getParameters: the second
+        XML reply belongs to getparameters, not to streamframes."""
+        callback = MagicMock()
+        live.onResponse("getparameters", callback)
+
+        live.getParameters(["general"])
+        self._feed(live, QRTPacketType.PacketXML, b"<QTM_Parameters_Ver_1.25>first</QTM_Parameters_Ver_1.25>")
+        callback.assert_called_once()
+
+        live.streamFrames(["3d"])
+        for i, packet_type in enumerate(after_stream_start):
+            if packet_type is QRTPacketType.PacketData:
+                self._feed_frame(live, framenumber=i)
+            else:
+                self._feed(live, packet_type)
+
+        live.getParameters(["general"])
+        with qtbot.waitSignal(live.responseReceived) as blocker:
+            self._feed(live, QRTPacketType.PacketXML, b"<QTM_Parameters_Ver_1.25>second</QTM_Parameters_Ver_1.25>")
+        assert blocker.args[0] == "getparameters"
+        assert "second" in blocker.args[1]
+        assert callback.call_count == 2
+        assert len(live._command_queue) == 0
+
+        # Frames keep flowing to packetReceived afterwards.
+        with qtbot.waitSignal(live.packetReceived) as blocker:
+            self._feed_frame(live, framenumber=99)
+        assert blocker.args[0].framenumber == 99
+        assert len(live._command_queue) == 0
+
+    def test_rejected_streamframes_does_not_discard_next_command(self, live, qtbot):
+        """QTM's error for a rejected streamframes is the streamframes' own; the
+        getparameters sent after it must still receive its XML reply."""
+        live.streamFrames(["3d"], frames="frequency:0")
+        live.getParameters(["general"])
+
+        with qtbot.waitSignal(live.error) as blocker:
+            self._feed(live, QRTPacketType.PacketError, b"Parse Error")
+        assert blocker.args[0] == "Parse Error"
+        assert not live._streaming
+        assert list(live._command_queue) == ["getparameters"]
+
+        with qtbot.waitSignal(live.responseReceived) as blocker:
+            self._feed(live, QRTPacketType.PacketXML, b"<QTM_Parameters_Ver_1.25/>")
+        assert blocker.args[0] == "getparameters"
+        assert len(live._command_queue) == 0
+
+    def test_error_after_stream_started_belongs_to_failing_command(self, live, qtbot):
+        """Once frames arrive, streamframes was accepted. A later error belongs to
+        the command that caused it, and the next reply to the command after that."""
+        live.streamFrames(["3d"])
+        self._feed_frame(live)
+
+        live.takeControl("wrong")
+        live.getQtmVersion()
+        with qtbot.waitSignal(live.error):
+            self._feed(live, QRTPacketType.PacketError, b"Wrong or missing password")
+        assert list(live._command_queue) == ["qtmversion"]
+
+        with qtbot.waitSignal(live.responseReceived) as blocker:
+            self._feed(live, QRTPacketType.PacketCommand, b"QTM Version is 2026.3")
+        assert blocker.args == ["qtmversion", "QTM Version is 2026.3"]
+        assert len(live._command_queue) == 0
 
 
 class TestQTMConnectionQuit:
