@@ -25,7 +25,17 @@ classifiers = [
 # QtCore / QtGui / QtNetwork / QtQml / QtQuick / QtQuickControls2 are all in
 # PySide6-Essentials. Qt Quick 3D (the scene extra) is in PySide6-Addons, which
 # pins Essentials to its own version, so pip keeps the two in lockstep.
-dependencies = ["PySide6-Essentials>=6.5", "qtm-rt>=3.0.0"]
+#
+# PySide6 6.12.0's Linux wheels are built against Python 3.12 headers but install
+# on 3.10/3.11 (PYSIDE-3474). There, Signal.emit(), disconnect() and void methods
+# drop a reference to True/False/None, and the app aborts once one reaches zero
+# ("free(): invalid pointer"). The Windows wheels are unaffected; macOS is
+# untested, so it keeps the older PySide6 too.
+dependencies = [
+    "PySide6-Essentials>=6.5",
+    "PySide6-Essentials<6.12; python_version < '3.12' and sys_platform != 'win32'",
+    "qtm-rt>=3.0.0",
+]
 
 [project.optional-dependencies]
 scene = ["PySide6-Addons>=6.5"]
