@@ -8,6 +8,11 @@ then needs the GIL; Python calls that block the GUI thread on the render thread
 deadlock there: QTest.qWait() and QQuickWindow.grabWindow(). So these tests
 also wait with qtbot.wait() / qtbot.waitSignal() and grab with the asynchronous
 grabToImage(), which are safe with either loop.
+
+The tests that show a window skip where Qt Quick 3D cannot render: no frame,
+a scene graph error, or a Qt Quick renderer that is not based on QRhi (e.g. the
+software renderer Qt falls back to with QT_QPA_PLATFORM=offscreen and no GPU).
+The hidden-window test runs everywhere.
 """
 
 import os
@@ -21,6 +26,7 @@ pytest.importorskip("PySide6.QtQuick3D", reason='needs PySide6-Addons: pip insta
 
 from PySide6.QtCore import QObject  # noqa: E402
 from PySide6.QtQml import QQmlApplicationEngine  # noqa: E402
+from PySide6.QtQuick import QSGRendererInterface  # noqa: E402
 
 from qtm_rt_pyside6.scene import DemoSource, QtmScene  # noqa: E402
 from qtm_rt_pyside6.scene.quick3d import setup_engine  # noqa: E402
@@ -80,8 +86,20 @@ def hidden(qtbot):
     h.close()
 
 
+def renderer_problem(window, qtlog) -> str | None:
+    """Why Qt Quick 3D cannot draw in this window, or None. Frames can still swap without it."""
+    api = window.rendererInterface().graphicsApi()
+    if not QSGRendererInterface.isApiRhiBased(api):
+        return f"Qt Quick uses the {api.name} renderer, not a QRhi-based one"
+    if api == QSGRendererInterface.GraphicsApi.Null:
+        return "Qt Quick uses QRhi's Null backend, which draws nothing"
+    if any("Qt Quick 3D is not functional" in record.message for record in qtlog.records):
+        return "Qt Quick 3D reports that it is not functional"
+    return None
+
+
 @pytest.fixture
-def shown(qtbot):
+def shown(qtbot, qtlog):
     h = Harness(visible=True)
     errors = []
     h.window.sceneGraphError.connect(lambda _error, message: errors.append(message))
@@ -90,6 +108,10 @@ def shown(qtbot):
             pass
     except Exception:  # noqa: BLE001 - pytest-qt's TimeoutError
         errors.append("no frame rendered")
+    if not errors:
+        problem = renderer_problem(h.window, qtlog)
+        if problem:
+            errors.append(problem)
     if errors:
         h.close()
         pytest.skip(f"Qt Quick 3D cannot render here: {errors[0]}")
