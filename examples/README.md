@@ -7,7 +7,8 @@ self-contained — install the package, start QTM, and run.
 
 - A QTM installation reachable on the network (or `127.0.0.1` if local).
 - `qtm-rt-pyside6` installed (`pip install qtm-rt-pyside6`, or
-  `pip install -e .` from a checkout).
+  `pip install -e .` from a checkout). The 3D examples need the `scene`
+  extra: `pip install "qtm-rt-pyside6[scene]"` (or `pip install -e ".[scene]"`).
 - For the streaming examples, QTM should be playing back data — load a
   file in QTM and choose **Play → Play with Real-Time output**, or run
   a live capture.
@@ -22,7 +23,8 @@ self-contained — install the package, start QTM, and run.
 | [`discovery_example.py`](discovery_example.py) | UDP-broadcast discovery of QTM instances on the network | `python discovery_example.py [interface_ip]` |
 | [`parameters_example.py`](parameters_example.py) | Request QTM configuration as XML and parse 3D markers, 6DOF bodies, and skeletons out of it | `python parameters_example.py` |
 | [`gui_example.py`](gui_example.py) | Qt Widgets app combining discovery, connect/disconnect, and a live data table with frame rate | `python gui_example.py` |
-| [`gui_3d_example/main.py`](gui_3d_example/main.py) | Qt Quick 3D viewer showing markers as spheres and skeletons as bones, with an orbit camera | `python gui_3d_example/main.py` |
+| [`scene_minimal.py`](scene_minimal.py) | The smallest 3D viewer: `QtmScene` + `QtmView` in a window | `python scene_minimal.py [host]` or `--demo` |
+| [`gui_3d_example/main.py`](gui_3d_example/main.py) | 3D viewer on the scene helpers: markers, bones, rigid bodies and keeled skeletons, a panel listing QTM's definitions, highlighting | `python gui_3d_example/main.py` (`--demo` without QTM) |
 
 If you're new to the SDK, start with `basic_example.py` to confirm the
 connection works, then look at `discovery_example.py` or one of the GUI
@@ -56,11 +58,20 @@ PySide6 / QtWidgets app with discovery, connection management, and a
 live data table. A good starting point for desktop tools built on top
 of the SDK.
 
+### `scene_minimal.py`
+About 15 lines of app around the 3D scene helpers: a `QtmScene` follows
+the connection (parameters, streaming, refreshes) and the `QtmView` QML
+type draws it with QTM's mouse controls. `--demo` feeds simulated data
+instead of connecting.
+
 ### `gui_3d_example/`
-PySide6 / Qt Quick 3D scene that streams 3D markers, 6DOF bodies, and
-skeletons from QTM and renders them as primitives with an orbit
-camera. The Python `main.py` provides the data backend; `main.qml`
-defines the scene.
+A fuller 3D viewer on the same helpers. `main.py` adds host discovery,
+connect / disconnect and demo data around a `QtmScene`; `main.qml` puts a
+panel of QTM's markers (grouped by name prefix), skeletons and rigid
+bodies next to a `QtmView`. Clicking a name or a point highlights it; the
+panel also switches the bone style, local axes and labels. The look comes
+from the `QtmTheme` singleton; drop Montserrat / Open Sans font files into
+a `fonts` folder next to the script to use them without installing them.
 
 ## Known limitation: TCP streaming only in these examples
 
