@@ -1,0 +1,133 @@
+<QTM_Parameters_Ver_1.25>
+    <The_3D>
+        <AxisUpwards>+Z</AxisUpwards>
+        <CalibrationTime>2000-01-01 00:00:00</CalibrationTime>
+        <Labels>22</Labels>
+        <Label>
+            <Name>HeadTop</Name>
+            <RGBColor>8388736</RGBColor>
+            <Trajectory_Type>Measured</Trajectory_Type>
+        </Label>
+        <Label>
+            <Name>HeadFront</Name>
+            <RGBColor>8388736</RGBColor>
+            <Trajectory_Type>Measured</Trajectory_Type>
+        </Label>
+        <Label>
+            <Name>HeadLeft</Name>
+            <RGBColor>8388736</RGBColor>
+            <Trajectory_Type>Measured</Trajectory_Type>
+        </Label>
+        <Label>
+            <Name>HeadRight</Name>
+            <RGBColor>8388736</RGBColor>
+            <Trajectory_Type>Measured</Trajectory_Type>
+        </Label>
+        <Label>
+            <Name>Sacrum</Name>
+            <RGBColor>8388736</RGBColor>
+            <Trajectory_Type>Measured</Trajectory_Type>
+        </Label>
+        <Label>
+            <Name>L_Shoulder</Name>
+            <RGBColor>16711680</RGBColor>
+            <Trajectory_Type>Measured</Trajectory_Type>
+        </Label>
+        <Label>
+            <Name>L_Elbow</Name>
+            <RGBColor>16711680</RGBColor>
+            <Trajectory_Type>Measured</Trajectory_Type>
+        </Label>
+        <Label>
+            <Name>L_Wrist</Name>
+            <RGBColor>16711680</RGBColor>
+            <Trajectory_Type>Measured</Trajectory_Type>
+        </Label>
+        <Label>
+            <Name>R_Shoulder</Name>
+            <RGBColor>255</RGBColor>
+            <Trajectory_Type>Measured</Trajectory_Type>
+        </Label>
+        <Label>
+            <Name>R_Elbow</Name>
+            <RGBColor>255</RGBColor>
+            <Trajectory_Type>Measured</Trajectory_Type>
+        </Label>
+        <Label>
+            <Name>R_Wrist</Name>
+            <RGBColor>255</RGBColor>
+            <Trajectory_Type>Measured</Trajectory_Type>
+        </Label>
+        <Label>
+            <Name>L_Hip</Name>
+            <RGBColor>16711680</RGBColor>
+            <Trajectory_Type>Measured</Trajectory_Type>
+        </Label>
+        <Label>
+            <Name>L_Knee</Name>
+            <RGBColor>16711680</RGBColor>
+            <Trajectory_Type>Measured</Trajectory_Type>
+        </Label>
+        <Label>
+            <Name>L_Ankle</Name>
+            <RGBColor>16711680</RGBColor>
+            <Trajectory_Type>Measured</Trajectory_Type>
+        </Label>
+        <Label>
+            <Name>L_Toe</Name>
+            <RGBColor>16711680</RGBColor>
+            <Trajectory_Type>Measured</Trajectory_Type>
+        </Label>
+        <Label>
+            <Name>R_Hip</Name>
+            <RGBColor>255</RGBColor>
+            <Trajectory_Type>Measured</Trajectory_Type>
+        </Label>
+        <Label>
+            <Name>R_Knee</Name>
+            <RGBColor>255</RGBColor>
+            <Trajectory_Type>Measured</Trajectory_Type>
+        </Label>
+        <Label>
+            <Name>R_Ankle</Name>
+            <RGBColor>255</RGBColor>
+            <Trajectory_Type>Measured</Trajectory_Type>
+        </Label>
+        <Label>
+            <Name>R_Toe</Name>
+            <RGBColor>255</RGBColor>
+            <Trajectory_Type>Measured</Trajectory_Type>
+        </Label>
+        <Label>
+            <Name>Wand_1</Name>
+            <RGBColor>65280</RGBColor>
+            <Trajectory_Type>Measured</Trajectory_Type>
+        </Label>
+        <Label>
+            <Name>Wand_2</Name>
+            <RGBColor>65280</RGBColor>
+            <Trajectory_Type>Measured</Trajectory_Type>
+        </Label>
+        <Label>
+            <Name>Wand_3</Name>
+            <RGBColor>65280</RGBColor>
+            <Trajectory_Type>Measured</Trajectory_Type>
+        </Label>
+        <Bones>
+            <Bone From="HeadTop" To="HeadFront" Color="-1380851536"/>
+            <Bone From="HeadLeft" To="HeadRight" Color="-1380851536"/>
+            <Bone From="L_Shoulder" To="L_Elbow" Color="-1380851536"/>
+            <Bone From="L_Elbow" To="L_Wrist" Color="-1380851536"/>
+            <Bone From="R_Shoulder" To="R_Elbow" Color="-1380851536"/>
+            <Bone From="R_Elbow" To="R_Wrist" Color="-1380851536"/>
+            <Bone From="L_Hip" To="L_Knee" Color="-1380851536"/>
+            <Bone From="L_Knee" To="L_Ankle" Color="-1380851536"/>
+            <Bone From="L_Ankle" To="L_Toe" Color="-1380851536"/>
+            <Bone From="R_Hip" To="R_Knee" Color="-1380851536"/>
+            <Bone From="R_Knee" To="R_Ankle" Color="-1380851536"/>
+            <Bone From="R_Ankle" To="R_Toe" Color="-1380851536"/>
+            <Bone From="Wand_1" To="Wand_2" Color="-1380851536"/>
+            <Bone From="Wand_2" To="Wand_3" Color="-1380851536"/>
+        </Bones>
+    </The_3D>
+</QTM_Parameters_Ver_1.25>

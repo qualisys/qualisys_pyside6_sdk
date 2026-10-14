@@ -13,7 +13,7 @@ PySide6-based SDK for QTM Real-Time Protocol. Uses Qt's network stack (`QTcpSock
 py -3.10 -m venv .venv
 .venv/Scripts/activate  # Windows
 pip install -r requirements-dev.txt
-pip install -e .
+pip install -e ".[scene]"   # the scene extra adds PySide6-Addons (Qt Quick 3D)
 
 # Run all tests
 pytest -v
@@ -36,6 +36,11 @@ ruff format .          # auto-fix formatting
 
 Tests use `pytest-qt` (configured in `pyproject.toml` with `qt_api = pyside6`). Use `qtbot.waitSignal()` for signal assertions.
 
+Never call `QTest.qWait()` or `QQuickWindow.grabWindow()` from Python while a Qt Quick 3D scene with the
+scene helpers is showing: Qt calls the instance tables' `getInstanceBuffer()` override from its render thread,
+which needs the GIL, while those calls block the GUI thread holding it - a deadlock. Use `qtbot.wait()`,
+`qtbot.waitSignal()` and `QQuickItem.grabToImage()`, or set `QSG_RENDER_LOOP=basic`.
+
 Version is derived from git tags via `setuptools-scm`. Tag a release with `v0.1.0` format.
 
 ## Architecture
@@ -45,6 +50,15 @@ Version is derived from git tags via `setuptools-scm`. Tag a release with `v0.1.
 - **`qtm_rt`** - Original SDK installed from PyPI (`qtm-rt>=3.0.0`). We import `packet` and `receiver` for binary parsing
 - **`qtm_rt_pyside6/connection.py`** - `QTMConnection(QObject)` main class using `QTcpSocket`
 - **`qtm_rt_pyside6/discovery.py`** - `QTMDiscovery(QObject)` for UDP broadcast discovery
+- **`qtm_rt_pyside6/scene/`** - 3D scene data layer, QtCore / QtGui only (PySide6-Essentials). Not imported by `qtm_rt_pyside6/__init__.py`.
+  - `parameters.py` - parameter XML -> `SceneParameters` (labels, colors, user bones, AxisUpwards, 6D bodies, skeleton hierarchy). QTM colors are `0x00BBGGRR`.
+  - `frame.py` - `SceneFrame`: lazily decoded packet (labeled / unlabeled markers, 6D with a column-major 3x3 matrix, `skeleton:global` quaternions); joints are `"<skeleton>:<segment>"`
+  - `skeleton.py` - joints and keeled bones `(start, end, keel, side)`; `math3d.py` - `AxisMapping` QTM -> Y-up scene (a proper rotation; Z up is `(x, z, -y)`)
+  - `scene.py` - `QtmScene(QObject)`: attaches to a `QTMConnection`, requests parameters, streams, latest frame published at 60 Hz, `pick()` / `bounds()` / `highlight()`; `demo.py` - `DemoSource`
+  - `theme.py` - `dark_palette()`, `apply_theme()`, `load_fonts()`
+- **`qtm_rt_pyside6/scene/quick3d/`** - needs PySide6-Addons (`[scene]` extra): `KeelBoneGeometry`, `GridGeometry` and the `QQuick3DInstancing` subclasses, registered as QML `Qualisys.Scene.Native`; `setup_engine(engine)` registers them and adds the import path
+- **`qtm_rt_pyside6/scene/qml/Qualisys/Scene/`** - the `Qualisys.Scene` QML module (package data): `QtmView`, `QtmCameraController`, the layers, `LabelOverlay`, `QtmTheme` singleton, `QtmButton` / `QtmSwitch` / `QtmSection`
+- **`qtm_rt_pyside6/__pyinstaller/`** - PyInstaller hook (`pyinstaller40` entry point) that bundles the QML module
 
 ### Signal Pattern
 

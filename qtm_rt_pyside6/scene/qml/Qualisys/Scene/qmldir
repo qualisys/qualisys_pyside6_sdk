@@ -1,0 +1,14 @@
+module Qualisys.Scene
+singleton QtmTheme 1.0 QtmTheme.qml
+QtmView 1.0 QtmView.qml
+QtmCameraController 1.0 QtmCameraController.qml
+MarkerLayer 1.0 MarkerLayer.qml
+BoneLayer 1.0 BoneLayer.qml
+SkeletonLayer 1.0 SkeletonLayer.qml
+RigidBodyLayer 1.0 RigidBodyLayer.qml
+LabelOverlay 1.0 LabelOverlay.qml
+Floor 1.0 Floor.qml
+QtmAxes 1.0 QtmAxes.qml
+QtmButton 1.0 QtmButton.qml
+QtmSwitch 1.0 QtmSwitch.qml
+QtmSection 1.0 QtmSection.qml
