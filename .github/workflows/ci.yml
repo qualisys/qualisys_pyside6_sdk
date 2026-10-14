@@ -21,6 +21,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         python-version: ["3.10", "3.11", "3.12", "3.13", "3.x"]
     env:
@@ -31,6 +32,18 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: sudo apt-get update && sudo apt-get install -y libegl1
+      # The Linux PySide6 6.12.0 wheels are built against Python 3.12 headers
+      # but install on 3.10/3.11 (PYSIDE-3474). There, returning True/False/None
+      # drops a reference (Signal.emit(), disconnect(), void methods), and the
+      # process aborts once one reaches zero: here at exit, after all tests pass
+      # ("bool_dealloc" / "free(): invalid pointer"). 3.12+ is unaffected, as
+      # those objects are immortal (PEP 683). Constrain every PySide6 wheel so
+      # pip resolves one consistent 6.11 set.
+      - name: Keep PySide6 below 6.12 on Python 3.10 and 3.11
+        if: matrix.python-version == '3.10' || matrix.python-version == '3.11'
+        run: |
+          printf '%s\n' "PySide6<6.12" "PySide6-Essentials<6.12" "PySide6-Addons<6.12" "shiboken6<6.12" > "$RUNNER_TEMP/pyside6-constraints.txt"
+          echo "PIP_CONSTRAINT=$RUNNER_TEMP/pyside6-constraints.txt" >> "$GITHUB_ENV"
       - run: |
           pip install -r requirements-dev.txt
           pip install -e .
