@@ -32,21 +32,20 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: sudo apt-get update && sudo apt-get install -y libegl1
-      # The Linux PySide6 6.12.0 wheels are built against Python 3.12 headers
-      # but install on 3.10/3.11 (PYSIDE-3474). There, returning True/False/None
-      # drops a reference (Signal.emit(), disconnect(), void methods), and the
-      # process aborts once one reaches zero: here at exit, after all tests pass
-      # ("bool_dealloc" / "free(): invalid pointer"). 3.12+ is unaffected, as
-      # those objects are immortal (PEP 683). Constrain every PySide6 wheel so
-      # pip resolves one consistent 6.11 set.
-      - name: Keep PySide6 below 6.12 on Python 3.10 and 3.11
-        if: matrix.python-version == '3.10' || matrix.python-version == '3.11'
-        run: |
-          printf '%s\n' "PySide6<6.12" "PySide6-Essentials<6.12" "PySide6-Addons<6.12" "shiboken6<6.12" > "$RUNNER_TEMP/pyside6-constraints.txt"
-          echo "PIP_CONSTRAINT=$RUNNER_TEMP/pyside6-constraints.txt" >> "$GITHUB_ENV"
       - run: |
           pip install -r requirements-dev.txt
           pip install -e ".[scene]"
+      # pyproject.toml keeps PySide6 below 6.12 on Linux with Python 3.10/3.11
+      # (PYSIDE-3474), where 6.12.0 aborts the test run at exit
+      - name: Check the PySide6 version
+        run: |
+          python - <<'PY'
+          import sys
+          import PySide6
+          version = tuple(int(part) for part in PySide6.__version__.split(".")[:2])
+          print("Python", sys.version.split()[0], "PySide6", PySide6.__version__)
+          assert sys.version_info >= (3, 12) or version < (6, 12), "PySide6 6.12 on Python < 3.12"
+          PY
       - run: pytest -v -rs
 
   # The core and the scene data layer must work without PySide6-Addons

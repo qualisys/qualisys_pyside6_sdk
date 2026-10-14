@@ -176,6 +176,7 @@ is the 3D scene above as a script (`--demo` runs it without QTM).
 
 - **No automatic reconnection.** If the connection drops, you must call `connectToHost()` again. Listen to the `disconnected` signal to detect this.
 - **Single-threaded.** `QTMConnection` and `QTMDiscovery` are `QObject` subclasses and must be used from the thread that created them (typically the main thread). Use Qt signals for cross-thread communication.
+- **PySide6 below 6.12 on Python 3.10 and 3.11 (except on Windows).** PySide6 6.12.0's Linux wheels are built for Python 3.12 but install on 3.10 and 3.11, where apps abort with `free(): invalid pointer` ([PYSIDE-3474](https://qt-project.atlassian.net/browse/PYSIDE-3474)). The package therefore keeps PySide6 below 6.12 there; macOS is untested, so it is included. Use Python 3.12 or later for the latest PySide6.
 - **Password sent in plain text.** `takeControl(password)` transmits the password unencrypted over TCP. This is a QTM protocol limitation — use on trusted networks only.
 
 ## Development
