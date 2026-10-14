@@ -57,8 +57,8 @@ disconnected = Signal()
 error = Signal(str)
 
 # Streaming (high-frequency)
-packetReceived = Signal(object)   # QRTPacket
-eventReceived = Signal(object)    # QRTEvent
+packetReceived = Signal(object)  # QRTPacket
+eventReceived = Signal(object)  # QRTEvent
 
 # Request/response (generic)
 responseReceived = Signal(str, object)  # (command_name, data)
