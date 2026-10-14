@@ -56,12 +56,27 @@ Item {
         return [o, view3d.mapTo3DScene(Qt.vector3d(x, y, 1000)).minus(o)]
     }
 
-    // The point under (x, y) in view coordinates, or ""
+    // The kinds of point that pickAt() (clicks and hover) considers: those on visible layers
+    readonly property var pickableKinds: {
+        var kinds = []
+        if (root.showMarkers) {
+            kinds.push("marker")
+            if (root.showUnlabeled)
+                kinds.push("unlabeled")
+        }
+        if (root.showSkeletons)
+            kinds.push("joint")
+        if (root.showRigidBodies)
+            kinds.push("body")
+        return kinds
+    }
+
+    // The visible point under (x, y) in view coordinates, or ""
     function pickAt(x, y) {
         if (!root.scene)
             return ""
         var r = rayAt(x, y)
-        return root.scene.pick(r[0], r[1])
+        return root.scene.pick(r[0], r[1], root.pickableKinds)
     }
 
     Connections {

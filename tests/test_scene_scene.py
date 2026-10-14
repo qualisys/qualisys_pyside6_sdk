@@ -3,8 +3,9 @@
 import math
 
 import pytest
-from PySide6.QtCore import QObject, Signal
+from PySide6.QtCore import QObject, QUrl, Signal
 from PySide6.QtGui import QVector3D
+from PySide6.QtQml import QQmlComponent, QQmlEngine
 
 from qtm_rt_pyside6 import QRTEvent
 from qtm_rt_pyside6.scene import DEFAULT_COMPONENTS, DemoSource, QtmScene
@@ -195,6 +196,27 @@ class TestQueries:
     def test_pick_kinds(self, live):
         o, d = self.ray_to((0.0, 0.0, 975.0), origin=(0.0, -5000.0, 975.0))
         assert live.pick(o, d, kinds={"joint"}) == "S:Hips"
+
+    def test_pick_kinds_from_qml(self, live):
+        o, d = self.ray_to((0.0, 0.0, 975.0), origin=(0.0, -5000.0, 975.0))
+        engine = QQmlEngine()
+        for name, value in (("qtmScene", live), ("rayOrigin", o), ("rayDirection", d)):
+            engine.rootContext().setContextProperty(name, value)
+        component = QQmlComponent(engine)
+        component.setData(
+            b"""import QtQml
+QtObject {
+    readonly property string any: qtmScene.pick(rayOrigin, rayDirection)
+    readonly property string joints: qtmScene.pick(rayOrigin, rayDirection, ["joint"])
+    readonly property string none: qtmScene.pick(rayOrigin, rayDirection, [])
+}""",
+            QUrl(),
+        )
+        picks = component.create()
+        assert picks is not None, [e.toString() for e in component.errors()]
+        assert picks.property("any") == live.pick(o, d) != "S:Hips"
+        assert picks.property("joints") == "S:Hips"
+        assert picks.property("none") == ""
 
     def test_bounds(self, live):
         x, y, z, r = live.bounds()

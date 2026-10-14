@@ -367,11 +367,13 @@ class QtmScene(QObject):
         self._set_highlighted([])
 
     @Slot(QVector3D, QVector3D, result=str)
+    @Slot(QVector3D, QVector3D, list, result=str)
     def pick(self, origin: QVector3D, direction: QVector3D, kinds=None) -> str:
         """The point closest in angle to a ray (scene coordinates, e.g. from View3D.mapTo3DScene),
         within pickTolerance degrees: a label, joint, rigid body or "Unlabeled #<id>"; "" for none.
 
-        From Python, `kinds` limits the candidates, e.g. {"marker", "joint"}."""
+        `kinds` limits the candidates to "marker", "unlabeled", "joint" and "body" points,
+        e.g. {"marker", "joint"} from Python or ["marker", "joint"] from QML."""
         frame = self._frame
         if frame is None or direction.isNull():
             return ""

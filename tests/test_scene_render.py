@@ -126,6 +126,21 @@ def test_qml_loads_without_warnings(qtbot, hidden):
     assert hidden.warnings == []
 
 
+def test_only_visible_layers_are_pickable(hidden):
+    def kinds():
+        return sorted(hidden.view.property("pickableKinds").toVariant())
+
+    assert kinds() == ["body", "joint", "marker", "unlabeled"]
+    hidden.view.setProperty("showUnlabeled", False)
+    assert kinds() == ["body", "joint", "marker"]
+    hidden.view.setProperty("showUnlabeled", True)
+    hidden.view.setProperty("showMarkers", False)
+    assert kinds() == ["body", "joint"]  # unlabeled markers are drawn by the marker layer
+    hidden.view.setProperty("showSkeletons", False)
+    hidden.view.setProperty("showRigidBodies", False)
+    assert kinds() == []
+
+
 def test_renders_demo_without_warnings(qtbot, shown):
     shown.demo.start()
     with qtbot.waitSignal(shown.scene.firstData, timeout=3000):
