@@ -6,7 +6,7 @@ PySide6-based SDK for the Qualisys Real-Time (RT) protocol. Stream motion captur
 
 ## Installation
 
-Requires Python 3.10+ and PySide6 6.0+.
+Requires Python 3.10+ and PySide6 6.5+.
 
 We recommend using a virtual environment to avoid conflicts with other packages:
 
@@ -24,8 +24,14 @@ source .venv/bin/activate
 Then install the package:
 
 ```bash
-pip install qtm-rt-pyside6
+pip install "qtm-rt-pyside6[scene]"
 ```
+
+The `scene` extra adds Qt Quick 3D (PySide6-Addons) for the [3D scene helpers](#3d-scene).
+For the connection, discovery and parameters alone, `pip install qtm-rt-pyside6`
+is enough: it needs only PySide6-Essentials (QtCore, QtGui, QtNetwork, QtQml,
+QtQuick, QtQuickControls2, QtWidgets). Apps that use other Qt modules, such as
+WebEngine or Charts, install `PySide6` (or `PySide6-Addons`) themselves.
 
 ## Quick Start
 
@@ -85,13 +91,86 @@ list — control, load/save, trigger, LED, quit, XML settings, etc.
 
 Valid streaming components: `2d`, `2dlin`, `3d`, `3dres`, `3dnolabels`, `3dnolabelsres`, `analog`, `analogsingle`, `force`, `forcesingle`, `6d`, `6dres`, `6deuler`, `6deulerres`, `gazevector`, `eyetracker`, `image`, `timecode`, `skeleton`, `skeleton:global`
 
+## 3D scene
+
+`qtm_rt_pyside6.scene` turns a connection into a 3D scene: QTM's labeled and
+unlabeled markers, its bones, rigid bodies and solved skeletons. A small app:
+
+```python
+import sys
+
+from PySide6.QtGui import QGuiApplication
+from PySide6.QtQml import QQmlApplicationEngine
+
+from qtm_rt_pyside6 import QTMConnection
+from qtm_rt_pyside6.scene import QtmScene, apply_theme
+from qtm_rt_pyside6.scene.quick3d import setup_engine
+
+app = QGuiApplication(sys.argv)
+apply_theme(app)
+connection = QTMConnection()
+scene = QtmScene(connection)
+engine = QQmlApplicationEngine()
+setup_engine(engine)
+engine.rootContext().setContextProperty("qtmScene", scene)
+engine.loadData(b"""
+import QtQuick
+import Qualisys.Scene
+Window { width: 1280; height: 800; visible: true; QtmView { anchors.fill: parent; scene: qtmScene } }
+""")
+connection.connectToHost("127.0.0.1")
+sys.exit(app.exec())
+```
+
+- **`QtmScene(connection)`** asks QTM for its 3D, 6D and skeleton parameters,
+  streams `3d`, `3dnolabels`, `6d` and `skeleton:global`, and asks again after
+  QTM events (capture or file playback started, calibration) or when the stream
+  no longer matches the parameters. The latest frame wins and is published at
+  60 Hz (`frameChanged`); `frameReceived(frame)` fires for every frame, for app
+  logic that must not miss one. `pick()`, `bounds()` and `highlight()` serve
+  the views; `DemoSource(scene)` feeds simulated data when no QTM is at hand.
+- **`SceneFrame`** decodes a packet on first use: `labeled`, `unlabeled`,
+  `rigid_bodies`, `joints` (named `"<skeleton>:<segment>"`), `skeleton_bones`,
+  `user_bones` and `position(name)`, all in QTM coordinates (mm).
+  `frame.mapping` converts to Qt Quick 3D's Y-up scene, honouring QTM's
+  `AxisUpwards`; for Z up that is `(x, y, z) -> (x, z, -y)`.
+- **`import Qualisys.Scene`** (QML) gives `QtmView`, a ready-made view with QTM's
+  mouse (left-drag orbits, right-drag pans, wheel zooms), picking, labels, floor,
+  grid, axes and layer switches, and its parts for custom views:
+  `QtmCameraController`, `MarkerLayer`, `BoneLayer`, `SkeletonLayer`,
+  `RigidBodyLayer`, `LabelOverlay`, `Floor` and `QtmAxes`.
+- **Skeletons** are drawn with *keeled* bones by default: octahedral bones with
+  one sharp, light ridge that marks each segment's forward axis, so a bone's
+  twist is visible. Left bones are blue, right gold. `QtmView.boneStyle` also
+  takes `"octahedral"`, `"capsule"` and `"stick"`; `axesMode` adds local-axis
+  tripods (`"selected"` or `"all"`).
+- **Look**: the `QtmTheme` singleton holds the colors and fonts (neutral dark
+  grays, Montserrat and Open Sans, one red accent); every token can be
+  overridden. `QtmButton`, `QtmSwitch` and `QtmSection` match it, and
+  `apply_theme(app)` sets up Fusion with a matching palette. The fonts are used
+  when installed, or from a folder passed to `load_fonts()`.
+
+The data layer (`qtm_rt_pyside6.scene`) needs only PySide6-Essentials;
+`qtm_rt_pyside6.scene.quick3d` needs the `scene` extra and says so if it is missing.
+
+**Render thread.** Qt Quick 3D calls the instance tables' `getInstanceBuffer()`
+from its render thread, which then needs Python's GIL. A Python call that blocks
+the GUI thread until the render thread is done deadlocks: `QTest.qWait()` and
+`QQuickWindow.grabWindow()` do. Use `app.exec()`, `processEvents()`, pytest-qt's
+`qtbot.wait()` / `waitSignal()` and the asynchronous `QQuickItem.grabToImage()`,
+or set `QSG_RENDER_LOOP=basic` to render on the GUI thread.
+
+**PyInstaller** picks up the `Qualisys.Scene` QML files through the package's
+hook (`pyinstaller40` entry point); no extra `--add-data` is needed.
+
 ## Examples
 
 Ready-to-run scripts live in [examples/](examples/) — see
 [examples/README.md](examples/README.md) for what each one demonstrates
 and how to run it. `basic_example.py` is the shortest path to verify
 your setup; the GUI examples (`gui_example.py` and `gui_3d_example/`)
-show how to wire the SDK into a desktop application.
+show how to wire the SDK into a desktop application, and `scene_minimal.py`
+is the 3D scene above as a script (`--demo` runs it without QTM).
 
 ## Known Limitations
 
@@ -118,8 +197,11 @@ source .venv/bin/activate
 
 # Install dev dependencies (pytest, pytest-qt, ruff, build) and the package
 pip install -r requirements-dev.txt
-pip install -e .
+pip install -e ".[scene]"
 ```
+
+Tests that need Qt Quick 3D are skipped without the `scene` extra, and the
+render tests are skipped where Qt Quick 3D cannot render (no GPU or software GL).
 
 Run tests and linting:
 ```bash

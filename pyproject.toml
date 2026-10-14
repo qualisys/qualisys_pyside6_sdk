@@ -22,7 +22,16 @@ classifiers = [
     "Topic :: Scientific/Engineering",
     "Topic :: Utilities",
 ]
-dependencies = ["PySide6>=6.0.0", "qtm-rt>=3.0.0"]
+# QtCore / QtGui / QtNetwork / QtQml / QtQuick / QtQuickControls2 are all in
+# PySide6-Essentials. Qt Quick 3D (the scene extra) is in PySide6-Addons, which
+# pins Essentials to its own version, so pip keeps the two in lockstep.
+dependencies = ["PySide6-Essentials>=6.5", "qtm-rt>=3.0.0"]
+
+[project.optional-dependencies]
+scene = ["PySide6-Addons>=6.5"]
+
+[project.entry-points.pyinstaller40]
+hook-dirs = "qtm_rt_pyside6.__pyinstaller:get_hook_dirs"
 
 [project.urls]
 Homepage = "https://github.com/qualisys/qualisys_pyside6_sdk"
@@ -31,8 +40,17 @@ Homepage = "https://github.com/qualisys/qualisys_pyside6_sdk"
 version_scheme = "guess-next-dev"
 local_scheme = "no-local-version"
 
+[tool.setuptools]
+# Package data is listed below; the QML directory is data, not a namespace package
+include-package-data = false
+
 [tool.setuptools.packages.find]
 include = ["qtm_rt_pyside6*"]
+namespaces = false
+
+[tool.setuptools.package-data]
+"qtm_rt_pyside6.scene" = ["qml/Qualisys/Scene/qmldir", "qml/Qualisys/Scene/*.qml"]
+"qtm_rt_pyside6.__pyinstaller" = ["hook-*.py"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

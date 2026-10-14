@@ -46,5 +46,22 @@ jobs:
           echo "PIP_CONSTRAINT=$RUNNER_TEMP/pyside6-constraints.txt" >> "$GITHUB_ENV"
       - run: |
           pip install -r requirements-dev.txt
+          pip install -e ".[scene]"
+      - run: pytest -v -rs
+
+  # The core and the scene data layer must work without PySide6-Addons
+  test-core-only:
+    runs-on: ubuntu-latest
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.x"
+      - run: sudo apt-get update && sudo apt-get install -y libegl1
+      - run: |
+          pip install -r requirements-dev.txt
           pip install -e .
-      - run: pytest -v
+      - run: python -c "import importlib.util as u; assert u.find_spec('PySide6.QtQuick3D') is None, 'Addons installed'"
+      - run: pytest -v -rs
