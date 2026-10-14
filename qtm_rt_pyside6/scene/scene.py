@@ -470,8 +470,8 @@ class QtmScene(QObject):
         self.clear()
 
     def _on_response(self, _command: str, data):
-        # Match parameter XML by content rather than by command name: replies can
-        # be attributed to an earlier queued command while streaming.
+        # Match parameter XML by content rather than by command name, so parameters
+        # that anyone requests on this connection update the scene.
         if not (isinstance(data, str) and "<QTM_Parameters" in data):
             return
         try:
