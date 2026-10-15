@@ -10,10 +10,32 @@ Source: https://code.qt.io/cgit/pyside/pyside-setup.git
 
 PySide6 provides Python bindings for the Qt framework. It is used as a runtime
 dependency and is dynamically linked. Users may replace PySide6 with any
-compatible version under the terms of the LGPL v3.
+compatible version under the terms of the LGPL v3. This covers PySide6-Essentials,
+which the core SDK depends on. Qt Quick 3D, used by the optional "scene" extra, is
+not available under the LGPL; see its entry below.
 
 The full text of the LGPL v3 license is available at:
 https://www.gnu.org/licenses/lgpl-3.0.html
+
+================================================================================
+Qt Quick 3D — The Qt Company (optional: the "scene" extra)
+================================================================================
+
+License: GNU General Public License v3.0 (GPL-3.0), or a commercial Qt license.
+         Not available under the LGPL.
+Homepage: https://doc.qt.io/qt-6/qtquick3d-index.html
+Installed by: pip install "qtm-rt-pyside6[scene]" (from PySide6-Addons)
+
+The 3D scene helpers (qtm_rt_pyside6.scene.quick3d and the Qualisys.Scene QML
+view and layers) render with Qt Quick 3D. This SDK does not include or
+distribute Qt Quick 3D: pip installs it as part of PySide6-Addons. A distributed
+application that uses these helpers must comply with the GPL v3, for example by
+releasing its source under the GPL v3, unless its author holds a commercial Qt
+license. The core SDK and the qtm_rt_pyside6.scene data layer do not use Qt
+Quick 3D.
+
+The full text of the GPL v3 license is available at:
+https://www.gnu.org/licenses/gpl-3.0.html
 
 ================================================================================
 Qualisys Python SDK (qtm_rt) — Qualisys AB

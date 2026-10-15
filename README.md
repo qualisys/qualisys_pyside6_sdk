@@ -33,6 +33,11 @@ is enough: it needs only PySide6-Essentials (QtCore, QtGui, QtNetwork, QtQml,
 QtQuick, QtQuickControls2, QtWidgets). Apps that use other Qt modules, such as
 WebEngine or Charts, install `PySide6` (or `PySide6-Addons`) themselves.
 
+Qt Quick 3D, which the `scene` extra adds, is licensed under GPLv3 or a
+commercial Qt license, not the LGPL. An app that draws with the 3D scene helpers
+therefore falls under GPLv3 when you distribute it, unless you have a commercial
+Qt license. See [License](#license).
+
 ## Quick Start
 
 ```python
@@ -214,3 +219,15 @@ ruff format --check .
 ## License
 
 MIT — see [LICENSE](LICENSE) and [THIRD_PARTY_LICENSES](THIRD_PARTY_LICENSES).
+
+The SDK's own code, the examples included, is MIT. The Qt modules it runs on have
+their own licenses:
+
+- **Core** (connection, discovery, parameters, and the `qtm_rt_pyside6.scene` data
+  layer): PySide6-Essentials, under the LGPLv3.
+- **3D view** (`qtm_rt_pyside6.scene.quick3d` and the `Qualisys.Scene` view and
+  layers, installed with the `scene` extra): Qt Quick 3D, under GPLv3 or a
+  commercial Qt license. If you distribute an app that uses it, the app must
+  comply with GPLv3, for example by releasing its source under GPLv3, unless you
+  have a commercial Qt license. The same applies to a build of an example that
+  draws in 3D: its code is MIT, but a build of it that you distribute is GPLv3.

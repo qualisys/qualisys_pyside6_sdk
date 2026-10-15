@@ -56,7 +56,7 @@ Version is derived from git tags via `setuptools-scm`. Tag a release with `v0.1.
   - `skeleton.py` - joints and keeled bones `(start, end, keel, side)`; `math3d.py` - `AxisMapping` QTM -> Y-up scene (a proper rotation; Z up is `(x, z, -y)`)
   - `scene.py` - `QtmScene(QObject)`: attaches to a `QTMConnection`, requests parameters, streams, latest frame published at 60 Hz, `pick()` / `bounds()` / `highlight()`; `demo.py` - `DemoSource`
   - `theme.py` - `dark_palette()`, `apply_theme()`, `load_fonts()`
-- **`qtm_rt_pyside6/scene/quick3d/`** - needs PySide6-Addons (`[scene]` extra): `KeelBoneGeometry`, `GridGeometry` and the `QQuick3DInstancing` subclasses, registered as QML `Qualisys.Scene.Native`; `setup_engine(engine)` registers them and adds the import path
+- **`qtm_rt_pyside6/scene/quick3d/`** - needs PySide6-Addons (`[scene]` extra). Qt Quick 3D is GPLv3 / commercial, not LGPL, so keep it out of the core and the data layer: `KeelBoneGeometry`, `GridGeometry` and the `QQuick3DInstancing` subclasses, registered as QML `Qualisys.Scene.Native`; `setup_engine(engine)` registers them and adds the import path
 - **`qtm_rt_pyside6/scene/qml/Qualisys/Scene/`** - the `Qualisys.Scene` QML module (package data): `QtmView`, `QtmCameraController`, the layers, `LabelOverlay`, `QtmTheme` singleton, `QtmButton` / `QtmSwitch` / `QtmSection`
 - **`qtm_rt_pyside6/__pyinstaller/`** - PyInstaller hook (`pyinstaller40` entry point) that bundles the QML module
 
