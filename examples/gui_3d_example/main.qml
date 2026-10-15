@@ -10,6 +10,7 @@ ApplicationWindow {
     visible: true
     title: "QTM 3D Viewer"
     color: QtmTheme.bg
+    palette: QtmTheme.palette  // the controls don't take the application palette
     font.family: QtmTheme.bodyFont
     font.pixelSize: QtmTheme.fontSize
 
