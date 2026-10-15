@@ -152,8 +152,10 @@ sys.exit(app.exec())
 - **Look**: the `QtmTheme` singleton holds the colors and fonts (neutral dark
   grays, Montserrat and Open Sans, one red accent); every token can be
   overridden. `QtmButton`, `QtmSwitch` and `QtmSection` match it, and
-  `apply_theme(app)` sets up Fusion with a matching palette. The fonts are used
-  when installed, or from a folder passed to `load_fonts()`.
+  `apply_theme(app)` sets up Fusion, the dark color scheme and a matching
+  application palette. Qt Quick Controls don't take the application palette,
+  so give each window the theme's: `ApplicationWindow { palette: QtmTheme.palette }`.
+  The fonts are used when installed, or from a folder passed to `load_fonts()`.
 
 The data layer (`qtm_rt_pyside6.scene`) needs only PySide6-Essentials;
 `qtm_rt_pyside6.scene.quick3d` needs the `scene` extra and says so if it is missing.

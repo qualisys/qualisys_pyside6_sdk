@@ -7,7 +7,13 @@ import QtQuick
 //
 // Every token is a plain property, so an app can override it at start-up:
 //     Component.onCompleted: QtmTheme.primary = "#0baccd"
+//
+// The standard controls (Label, TextField, ComboBox, ...) take their colors from
+// the palette below; give it to each window:
+//     ApplicationWindow { palette: QtmTheme.palette }
 QtObject {
+    id: theme
+
     // Surfaces
     property color bg: "#1f1f1f"            // panels
     property color bgBar: "#1a1a1a"         // header, footer, tool strips
@@ -59,4 +65,43 @@ QtObject {
     property color center: "#a0a0a0"
     property color labelText: "#ffffff"
     property color labelOutline: "#000000"
+
+    // Palette for the standard controls, the same as dark_palette() in Python.
+    // Qt Quick Controls don't use the application palette that apply_theme() sets:
+    // they start from their style's, which for Fusion is the platform's, light on
+    // a light desktop. A window follows the palette it is given, so tokens changed
+    // at start-up still reach its controls.
+    readonly property Palette palette: Palette {
+        window: theme.bg
+        base: theme.bgInset
+        alternateBase: "#242424"
+        button: theme.line
+        brightText: theme.text
+        highlight: theme.neutral            // selections and checked controls in light gray, not a color
+        highlightedText: theme.bgBar
+        link: theme.neutral
+        placeholderText: theme.overline
+        toolTipBase: "#242424"
+        toolTipText: theme.text
+        light: theme.lineStrong
+        midlight: "#303030"
+        mid: "#242424"
+        dark: "#0e0e0e"
+        shadow: "#000000"
+
+        // Text roles per color group: the plain role sets all three groups, and
+        // the order the bindings run in is not defined
+        active.windowText: theme.text
+        active.text: theme.text
+        active.buttonText: theme.text
+        inactive.windowText: theme.text
+        inactive.text: theme.text
+        inactive.buttonText: theme.text
+        disabled.windowText: theme.overline
+        disabled.text: theme.overline
+        disabled.buttonText: theme.overline
+
+        // accent is Qt 6.6 and later
+        Component.onCompleted: if ("accent" in this) accent = Qt.binding(() => theme.neutral)
+    }
 }
